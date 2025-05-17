@@ -140,7 +140,7 @@ def main():
 
         if ( tok.type == "TkNum" ):
             print( f"{tok.type}({tok.value}) {tok.lineno} {tok.lexpos}")
-        if ( tok.type == "TkId"):
+        elif ( tok.type == "TkId"):
             print( f"{tok.type}(\"{tok.value}\") {tok.lineno} {tok.lexpos}")
         else:
             print( f"{tok.type} {tok.lineno} {tok.lexpos}")
