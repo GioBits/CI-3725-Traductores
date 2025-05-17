@@ -134,7 +134,7 @@ def main():
         column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
         if column <= 0:
             column = t.lexpos + 1
-        print(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
+        errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
         t.lexer.skip(1)
 
     # Actualizar la posición de la columna
@@ -173,13 +173,13 @@ def main():
     for tok in lexer:
         column = find_column(input_data, tok)
         if (tok.type == "TkNum"):
-            print(f"{tok.type}({tok.value}) {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type}({tok.value}) {tok.lineno} {column}")
         elif (tok.type == "TkId"):
-            print(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
         elif (tok.type == "TkString"):
-            print(f"{tok.type}({tok.value}) {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
         else:
-            print(f"{tok.type} {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type} {tok.lineno} {column}")
 
     # Si hay errores, solo mostrar los errores
     if errors:
