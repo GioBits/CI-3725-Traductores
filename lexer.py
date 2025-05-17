@@ -8,6 +8,7 @@ import ply.lex as Lex
 
 def main():
 
+    # palabras reservadas del lenguaje
     reserved = {
         "if" : "TkIf" ,
         "end" : "TkEnd" ,
