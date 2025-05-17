@@ -8,10 +8,19 @@ import ply.lex as Lex
 
 def main():
 
-    tokens = (
-        "TkIf" ,
-        "TkEnd" ,
-        "TkWhile" ,
+    reserved = {
+        "if" : "TkIf" ,
+        "end" : "TkEnd" ,
+        "while" : "TkWhile" ,
+        "or" : "TkOr" ,
+        "and" : "TkAnd",
+        "bool" : "TkBool",
+        "true" : "TkTrue",
+        "false" : "TkFalse",
+        "skip" : "TkSkip"
+    }
+
+    tokens = [
         "TkOBlock" ,
         "TkCBlock" ,
         "TkSoForth" ,
@@ -25,8 +34,6 @@ def main():
         "TkPlus" ,
         "TkMinus" ,
         "TkMult" ,
-        "TkOr" ,
-        "TkAnd" ,
         "TkNot" ,
         "TkLess" ,
         "TkLeq" ,
@@ -39,19 +46,15 @@ def main():
         "TkTowPoints" ,
         "TkApp" ,
         "TkNum",
-        "TkTrue", #########
-        "TkFalse",#########
-        "TkSkip",
-        "TkString",     # De aquí para abajo me falta agregar reglas
+        "TkString",     # esta regla falta definirla
         "TkId"
 
-    )
+    ] + list(reserved.values())
+
+
 
     # tokens sencillos
 
-    t_TkIf = "if"
-    t_TkEnd = "end"
-    t_TkWhile = "while"
     t_TkOBlock = r"\{"
     t_TkCBlock = r"\}"
     t_TkSoForth = r"\. \."   #revisar esto bien
@@ -65,8 +68,6 @@ def main():
     t_TkPlus = r"\+"
     t_TkMinus = r"\-"
     t_TkMult = r"\*"
-    t_TkOr = "or"
-    t_TkAnd = "and"
     t_TkNot = r"\!"
     t_TkLess = r"\<"
     t_TkLeq = r"\<\="
@@ -78,17 +79,15 @@ def main():
     t_TkCBracket = r"\]"
     t_TkTowPoints = r"\:"
     t_TkApp = r"\."
-    t_TkTrue = "true"
-    t_TkFalse = "false"
-    t_TkSkip = "skip"
 
     # tokens especiales
 
     def t_TkId( t ):
         r"[a-zA-Z_][a-zA-Z_0-9]*"
+        t.type = reserved.get(t.value, "TkId")
         return t
     
-    def t_TkString( t ):
+    #def t_TkString( t ):
         
 
 
@@ -123,8 +122,8 @@ def main():
     # dato de prueba
 
     prueba = """
-    3 + 4 * 10 ( and while )
-    + -20 *2  :,=@=  var Var  
+    3 + 4 * 10 ( and while ) true
+    + -20 *2  :,=@=  var Var  bool Bool
     """
 
     # entrada del dato
