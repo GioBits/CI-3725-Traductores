@@ -38,7 +38,13 @@ def main():
         "TkCBracket" ,
         "TkTowPoints" ,
         "TkApp" ,
-        "TkNum"
+        "TkNum",
+        "TkTrue", #########
+        "TkFalse",#########
+        "TkSkip",
+        "TkString",     # De aquí para abajo me falta agregar reglas
+        "TkId"
+
     )
 
     # tokens sencillos
@@ -72,6 +78,9 @@ def main():
     t_TkCBracket = r"\]"
     t_TkTowPoints = r"\:"
     t_TkApp = r"\."
+    t_TkTrue = "true"
+    t_TkFalse = "false"
+    t_TkSkip = "skip"
 
     # tokens especiales
 
@@ -82,7 +91,7 @@ def main():
 
     # tokens ignorados
 
-    t_ignore = " \t"
+    t_ignore = " \t\n" # revisar que esto no genere problemas
 
     # conteo de lineas 
     
@@ -115,12 +124,16 @@ def main():
     lexer.input( prueba )
 
     # procesamiento del dato
+    # se itera sobre lo que parece una secuencia del tipo LexToken
+    for tok in lexer:
+        # hay ciertos atributos en Lextoken entre ellos
+        # el tipo que los definimos nostros, el valor 
+        # la línea y la posición según lo que pidió flaviani
 
-    while True:
-        tok = lexer.token()
-        if not tok:
-            break
-        print( tok )
+        if ( tok.type == "TkNum" ):
+            print( f"{tok.type}({tok.value}) {tok.lineno} {tok.lexpos}")
+        else:
+            print( f"{tok.type} {tok.lineno} {tok.lexpos}")
 
 
 
