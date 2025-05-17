@@ -102,7 +102,7 @@ def main():
     # manejo de errores 
     
     def t_error( t ):
-        print( " Error ")
+        print( f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {t.lexpos}")
         t.lexer.skip(1)
 
 
@@ -116,7 +116,7 @@ def main():
 
     prueba = """
     3 + 4 * 10 ( and while )
-    + -20 *2      
+    + -20 *2  :,=@=    
     """
 
     # entrada del dato
