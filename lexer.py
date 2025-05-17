@@ -118,7 +118,7 @@ def main():
         return t
 
     def t_TkString(t):
-        r'"[^"\\]*(?:\\[n"\\][^"\\]*)*"'
+        r'"[^"\\\n]*(?:\\[n"\\][^"\\\n]*)*"'
         t.value = t.value[1:-1]  # Remover las comillas
         return t
 
