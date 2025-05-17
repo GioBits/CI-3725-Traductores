@@ -84,6 +84,14 @@ def main():
 
     # tokens especiales
 
+    def t_TkId( t ):
+        r"[a-zA-Z_][a-zA-Z_0-9]*"
+        return t
+    
+    def t_TkString( t ):
+        
+
+
     def t_TkNum( t ):
         r"\d+"
         t.value = int(t.value)
@@ -116,7 +124,7 @@ def main():
 
     prueba = """
     3 + 4 * 10 ( and while )
-    + -20 *2  :,=@=    
+    + -20 *2  :,=@=  var Var  
     """
 
     # entrada del dato
@@ -132,6 +140,8 @@ def main():
 
         if ( tok.type == "TkNum" ):
             print( f"{tok.type}({tok.value}) {tok.lineno} {tok.lexpos}")
+        if ( tok.type == "TkId"):
+            print( f"{tok.type}(\"{tok.value}\") {tok.lineno} {tok.lexpos}")
         else:
             print( f"{tok.type} {tok.lineno} {tok.lexpos}")
 
