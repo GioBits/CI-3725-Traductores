@@ -4,21 +4,46 @@
 
 import ply.yacc as Yacc
 import ply.lex as Lex
+import sys
 
 
 def main():
+    # Verificar que se proporcionó un archivo como argumento
+    if len(sys.argv) != 2:
+        print("Error: Por favor proporcione un archivo .imperat como argumento")
+        print("Uso: python lexer.py archivo.imperat")
+        sys.exit(1)
+
+    # Verificar que el archivo tenga la extensión correcta
+    if not sys.argv[1].endswith('.imperat'):
+        print("Error: El archivo debe tener extensión .imperat")
+        sys.exit(1)
+
+    # Intentar abrir y leer el archivo
+    try:
+        with open(sys.argv[1], 'r') as file:
+            input_data = file.read()
+    except FileNotFoundError:
+        print(f"Error: No se encontró el archivo {sys.argv[1]}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error al leer el archivo: {str(e)}")
+        sys.exit(1)
 
     # palabras reservadas del lenguaje
     reserved = {
-        "if" : "TkIf" ,
-        "end" : "TkEnd" ,
-        "while" : "TkWhile" ,
-        "or" : "TkOr" ,
+        "if" : "TkIf",
+        "end" : "TkEnd",
+        "while" : "TkWhile",
+        "or" : "TkOr",
         "and" : "TkAnd",
         "bool" : "TkBool",
         "true" : "TkTrue",
         "false" : "TkFalse",
-        "skip" : "TkSkip"
+        "skip" : "TkSkip",
+        "int" : "TkInt",
+        "function" : "TkFunction",
+        "print" : "TkPrint"
     }
 
     tokens = [
@@ -83,14 +108,19 @@ def main():
 
     # tokens especiales
 
-    def t_TkId( t ):
+    def t_COMMENT(t):
+        r'//.*'
+        pass  # No retorna nada - ignora los comentarios
+        
+    def t_TkId(t):
         r"[a-zA-Z_][a-zA-Z_0-9]*"
         t.type = reserved.get(t.value, "TkId")
         return t
-    
-    #def t_TkString( t ):
-        
 
+    # Actualizar la posición de la columna
+    def find_column(input, token):
+        line_start = input.rfind('\n', 0, token.lexpos) + 1
+        return (token.lexpos - line_start) + 1
 
     def t_TkNum( t ):
         r"\d+"
@@ -99,7 +129,7 @@ def main():
 
     # tokens ignorados
 
-    t_ignore = " \t\n" # revisar que esto no genere problemas
+    t_ignore = " \t" # revisar que esto no genere problemas
 
     # conteo de lineas 
     
@@ -120,31 +150,22 @@ def main():
 
 
 
-    # dato de prueba
-
-    prueba = """
-    3 + 4 * 10 ( and while ) true
-    + -20 *2  :,=@=  var Var  bool Bool
-    """
-
     # entrada del dato
 
-    lexer.input( prueba )
+    lexer.input(input_data)
 
     # procesamiento del dato
-    # se itera sobre lo que parece una secuencia del tipo LexToken
     for tok in lexer:
-        # hay ciertos atributos en Lextoken entre ellos
-        # el tipo que los definimos nostros, el valor 
-        # la línea y la posición según lo que pidió flaviani
-
-        if ( tok.type == "TkNum" ):
-            print( f"{tok.type}({tok.value}) {tok.lineno} {tok.lexpos}")
-        elif ( tok.type == "TkId"):
-            print( f"{tok.type}(\"{tok.value}\") {tok.lineno} {tok.lexpos}")
+        # Calcular la columna correcta
+        column = find_column(input_data, tok)
+        if (tok.type == "TkNum"):
+            print(f"{tok.type}({tok.value}) {tok.lineno} {column}")
+        elif (tok.type == "TkId"):
+            print(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
         else:
-            print( f"{tok.type} {tok.lineno} {tok.lexpos}")
+            print(f"{tok.type} {tok.lineno} {column}")
 
 
 
-main()
+if __name__ == "__main__":
+    main()
