@@ -33,10 +33,10 @@ def main():
     # palabras reservadas del lenguaje
     reserved = {
         "if" : "TkIf",
+        "fi" : "TkFi",
         "end" : "TkEnd",
         "while" : "TkWhile",
         "or" : "TkOr",
-        "and" : "TkAnd",
         "bool" : "TkBool",
         "true" : "TkTrue",
         "false" : "TkFalse",
@@ -70,9 +70,9 @@ def main():
         "TkOBracket" ,
         "TkCBracket" ,
         "TkTowPoints" ,
-        "TkApp" ,
+        "TkApp",
         "TkNum",
-        "TkString",     # esta regla falta definirla
+        "TkString",     #TODO esta regla falta definirla
         "TkId"
 
     ] + list(reserved.values())
@@ -117,12 +117,24 @@ def main():
         t.type = reserved.get(t.value, "TkId")
         return t
 
+    def t_TkString(t):
+        r'"[^"\\]*(?:\\[n"\\][^"\\]*)*"'
+        t.value = t.value[1:-1]  # Remover las comillas
+        return t
+
+    def t_TkNum(t):
+        r"\d+"
+        t.value = int(t.value)
+        return t
+
     # manejo de errores 
     errors = []  # Lista para almacenar errores
 
     def t_error(t):
         column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
-        errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
+        if column <= 0:
+            column = t.lexpos + 1
+        print(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
         t.lexer.skip(1)
 
     # Actualizar la posición de la columna
@@ -133,14 +145,9 @@ def main():
         column = (token.lexpos - last_cr)
         return column
 
-    def t_TkNum( t ):
-        r"\d+"
-        t.value = int(t.value)
-        return t
-
     # tokens ignorados
 
-    t_ignore = " \t" # revisar que esto no genere problemas
+    t_ignore = " \t"
 
     # conteo de lineas 
     
@@ -155,7 +162,7 @@ def main():
 
 
 
-    # entrada del dato
+    # entrada de la data
 
     lexer.input(input_data)
 
@@ -166,11 +173,13 @@ def main():
     for tok in lexer:
         column = find_column(input_data, tok)
         if (tok.type == "TkNum"):
-            tokens_found.append(f"{tok.type}({tok.value}) {tok.lineno} {column}")
+            print(f"{tok.type}({tok.value}) {tok.lineno} {column}")
         elif (tok.type == "TkId"):
-            tokens_found.append(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
+            print(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
+        elif (tok.type == "TkString"):
+            print(f"{tok.type}({tok.value}) {tok.lineno} {column}")
         else:
-            tokens_found.append(f"{tok.type} {tok.lineno} {column}")
+            print(f"{tok.type} {tok.lineno} {column}")
 
     # Si hay errores, solo mostrar los errores
     if errors:
