@@ -117,10 +117,21 @@ def main():
         t.type = reserved.get(t.value, "TkId")
         return t
 
+    # manejo de errores 
+    errors = []  # Lista para almacenar errores
+
+    def t_error(t):
+        column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
+        errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
+        t.lexer.skip(1)
+
     # Actualizar la posición de la columna
     def find_column(input, token):
-        line_start = input.rfind('\n', 0, token.lexpos) + 1
-        return (token.lexpos - line_start) + 1
+        last_cr = input.rfind('\n', 0, token.lexpos)
+        if last_cr < 0:
+            last_cr = -1
+        column = (token.lexpos - last_cr)
+        return column
 
     def t_TkNum( t ):
         r"\d+"
@@ -137,12 +148,6 @@ def main():
         r"\n+"
         t.lexer.lineno += len(t.value)
 
-    # manejo de errores 
-    
-    def t_error( t ):
-        print( f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {t.lexpos}")
-        t.lexer.skip(1)
-
 
     # llamada al contructor lexico
 
@@ -154,16 +159,27 @@ def main():
 
     lexer.input(input_data)
 
+    # Lista para almacenar tokens
+    tokens_found = []
+    
     # procesamiento del dato
     for tok in lexer:
-        # Calcular la columna correcta
         column = find_column(input_data, tok)
         if (tok.type == "TkNum"):
-            print(f"{tok.type}({tok.value}) {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type}({tok.value}) {tok.lineno} {column}")
         elif (tok.type == "TkId"):
-            print(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
         else:
-            print(f"{tok.type} {tok.lineno} {column}")
+            tokens_found.append(f"{tok.type} {tok.lineno} {column}")
+
+    # Si hay errores, solo mostrar los errores
+    if errors:
+        for error in errors:
+            print(error)
+    else:
+        # Si no hay errores, mostrar los tokens
+        for token in tokens_found:
+            print(token)
 
 
 
