@@ -1,6 +1,6 @@
-# Owner(s):
-# Date:
-# Description:
+# Owner(s): Sergio Carrillo  y David Pereira 18-10245
+# Date: 19-05-2025
+# Description: Proyecto Etapa1 CI-3725 Traductores e Interpretadores 
 
 import ply.yacc as Yacc
 import ply.lex as Lex
@@ -8,6 +8,11 @@ import sys
 
 
 def main():
+    """El algoritmo recibe como algoritmo de línea de comando el archivo.
+        Hace un análisis de caracteres del archivo, reconoce los tokens
+        del lenguaje e indica medinate errores por terminal cuando un 
+        caracter que no pertenece a la gramática es introducido.
+    """
     # Verificar que se proporcionó un archivo como argumento
     if len(sys.argv) != 2:
         print("Error: Por favor proporcione un archivo .imperat como argumento")
@@ -72,7 +77,7 @@ def main():
         "TkTowPoints" ,
         "TkApp",
         "TkNum",
-        "TkString",     #TODO esta regla falta definirla
+        "TkString",
         "TkId"
 
     ] + list(reserved.values())
@@ -83,8 +88,8 @@ def main():
 
     t_TkOBlock = r"\{"
     t_TkCBlock = r"\}"
-    t_TkSoForth = r"\. \."   #revisar esto bien
-    t_TkComma = r"\,"       #no se si sea necesario de esta forma
+    t_TkSoForth = r"\. \."   
+    t_TkComma = r"\,"       
     t_TkOpenPar = r"\("
     t_TkClosePar = r"\)"
     t_TkAsig = r"\:\="
