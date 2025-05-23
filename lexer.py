@@ -1,4 +1,4 @@
-# Owner(s): Sergio Carrillo  y David Pereira 18-10245
+# Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
 # Date: 19-05-2025
 # Description: Proyecto Etapa1 CI-3725 Traductores e Interpretadores 
 
@@ -48,7 +48,8 @@ def main():
         "skip" : "TkSkip",
         "int" : "TkInt",
         "function" : "TkFunction",
-        "print" : "TkPrint"
+        "print" : "TkPrint",
+        "and" : "TkAnd"
     }
 
     tokens = [
