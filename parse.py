@@ -175,56 +175,89 @@ def main():
 
     precedence = (
         ("left", "TkPlus", "TkMinus"),
-        ("left", "TkMult")
-        ("right", "TkMinus")  # menos unario
+        ("left", "TkMult"),
+        ("right", "TkMinus", "TkNot")  # menos unario
     )
 
-
+    # Se define símbolo inicial
+    start = "Block"
     # Se definen las reglas de la gramatica
+    
+    def p_empty(p):
+        "empty :"
+        pass
 
     def p_block(p):
         """
-        Block : TkOBlock Declare
-              | TkOBlock Instruction
+        Block : TkOBlock Secuencing
         """
 
-    def p_declare(p):
-        """
-        Declare : TkBool variable
-                | TkInt variable
-                | variable
-        variable : TkId Comma variable
-                 | TkId
-        Comma : TkComma
-        """
-    def p_writefunction(p):
-        """
-        WriteFuntion : TkFunction range
-        range : TkOBracket TkSoForth Tknum TkCBracket
-        """
-    def p_instruction(p):
-        """
-        Instruction : Asig
-        """
     def p_secuencing(p):
         """
         Secuencing : Declare TkSemicolon Declare
                    | Declare TkSemicolon Instruction
                    | Instruction TkSemicolon Instruction
         """
+    def p_declare(p):
+        """
+        Declare : TkBool variable
+                | TkInt variable
+                | TkFunction range variable
+                | empty
+        range : TkOBracket TkSoForth TkNum TkCBracket
+        variable : TkId Comma variable
+                 | TkId
+        Comma : TkComma
+        """
+
+    def p_instruction(p):
+        """
+        Instruction : Asig
+                    | While
+                    | If
+                    | Print
+                    | Skip
+        """
+
     def p_asig(p):
         """
-        
+        Asig : Ident TkAsig expression
+             | Ident TkAsig WriteFunction
         """
-    def p_conditional(p):
+    def p_writefunction(p):
         """
-        If : 
+        WriteFunction : TkFunction TkOpenPar Literal TwoPoints expression TkClosePar WriteFunction
+                     | empty
+        TwoPoints : TkTowPoints
         """
-    def p_bucle(p):
+    def p_modificadores_flujo(p):
         """
+        If : TkIf condition Then Instruction Guard TkFi
+        Guard : condition Then Instruction Guard
+              | empty
+        While : TkWhile condition Then Instruction TkEnd
+        condition : expression Equal expression 
+                  | expression NEqual expression
+                  | expression Leq expression
+                  | expression Less expression
+                  | expression Geq expression
+                  | expression Greater expression
+                  | And condition
+                  | Or condition
+        And : TkAnd
+        Or : TkOr
+        NEqual : TkNEqual
+        Equal : TkEqual
+        Leq : TkLeq
+        Less : TkLess
+        Geq : TkGeq
+        Greater : TkGreater
+        Then : TkArrow
         """
+
     def p_skip(p):
         """
+        Skip : TkSkip
         """
     def p_print(p):
         """
@@ -237,15 +270,15 @@ def main():
         expression : expression Plus expression
                    | expression Minus expression
                    | expression TkMult expression
+                   | Minus expression
                    | TkOpenPar expression TkClosePar
                    | Literal
                    | Ident
                    | String
-        Asig : Ident TkAsig expression
         Plus : TkPlus
         Minus : TkMinus
         Literal : TkNum
-        Indent : TkId
+        Ident : TkId
         String : TkString
         """
         if p[2] == "+":
