@@ -239,7 +239,7 @@ def main():
         """
     def p_modificadores_flujo(p):
         """
-        If : TkIf expression Then Instruction Guard TkFi
+        If : TkIf expression Then Instruction Guard TkFi TkSemicolon
         Guard : TkGuard expression Then Instruction Guard
               | empty
         While : TkWhile expression Then Instruction TkEnd
@@ -258,21 +258,23 @@ def main():
     # estudiar la forma como se expresa esta gramática
     def p_binary_expressions(p):
         """
-        expression : expression Plus expression
-                   | expression Minus expression
-                   | expression Mult expression
-                   | expression Equal expression 
-                   | expression NEqual expression
-                   | expression Leq expression
-                   | expression Less expression
-                   | expression Geq expression
-                   | expression Greater expression
-                   | expression And expression
-                   | expression Or expression
-                   | TkOpenPar expression TkClosePar
-                   | Literal
-                   | Ident
-                   | String
+        expression : expression Plus termino
+                   | expression Minus termino
+                   | expression Equal termino 
+                   | expression NEqual termino
+                   | expression Leq termino
+                   | expression Less termino
+                   | expression Geq termino
+                   | expression Greater termino
+                   | expression And termino
+                   | expression Or termino
+                   | termino
+        termino : termino Mult factor
+                | factor
+        factor : TkOpenPar expression TkClosePar
+               | Literal
+               | Ident
+               | String
         And : TkAnd
         Or : TkOr
         Mult : TkMult
@@ -297,8 +299,8 @@ def main():
 
     def p_unary_expression(p):
         """
-        expression : Not expression %prec UMinus
-                   | Minus expression
+        expression : Not factor
+                   | Minus factor %prec UMinus
         Not : TkNot
         """
 
@@ -310,21 +312,11 @@ def main():
 
     # constructor del parser
 
-    parser = Yacc.yacc()
-
-
-
-
-
-
-
-    # correr parser
-
-    parser(input_data)
+    while True:
+        parser = Yacc.yacc()
+        result = parser.parse(input_data)
+        print(result)
     
-
-
-
 
 
 if __name__ == "__main__":
