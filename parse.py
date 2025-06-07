@@ -196,30 +196,21 @@ def main():
 
     def p_secuencing(p):
         """
-        Secuencing : Declare TkSemicolon Declare
-                   | Declare TkSemicolon Instruction
-                   | Instruction TkSemicolon Instruction
+        Secuencing : TkSemicolon Declare
+                   | TkSemicolon Asig
+                   | TkSemicolon While
+                   | TkSemicolon If
+                   | TkSemicolon Print
+                   | TkSemicolon Skip
+                   | TkSemicolon App
         """
     def p_declare(p):
         """
-        Declare : TkBool variable
-                | TkInt variable
-                | TkFunction range variable
-                | empty
-        range : TkOBracket TkSoForth TkNum TkCBracket
-        variable : TkId Comma variable
-                 | TkId
-        Comma : TkComma
-        """
-
-    def p_instruction(p):
-        """
-        Instruction : Asig
-                    | While
-                    | If
-                    | Print
-                    | Skip
-                    | empty
+        Declare : TkBool Ident Comma Secuencing
+                | TkInt Ident Comma Secuencing
+                | TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma Secuencing
+        Comma : TkComma Ident
+              | empty
         """
 
     def p_asig(p):
@@ -230,7 +221,7 @@ def main():
     def p_writefunction(p):
         """
         WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar WriteFunction
-                     | empty
+                      | empty
         TwoPoints : TkTowPoints
         """
     def p_app(p):
@@ -239,10 +230,14 @@ def main():
         """
     def p_modificadores_flujo(p):
         """
-        If : TkIf expression Then Instruction Guard TkFi TkSemicolon
-        Guard : TkGuard expression Then Instruction Guard
+        If : TkIf expression Then Asig Secuencing Guard TkFi
+           | TkIf expression Then While Secuencing Guard TkFi
+           | TkIf expression Then If Secuencing Guard TkFi
+           | TkIf expression Then Print Secuencing Guard TkFi
+           | TkIf expression Then Skip Secuencing Guard TkFi
+        Guard : TkGuard expression Then Asig Guard
               | empty
-        While : TkWhile expression Then Instruction TkEnd
+        While : TkWhile expression Then Asig TkEnd
         Then : TkArrow
         """
 
@@ -292,10 +287,6 @@ def main():
         Ident : TkId
         String : TkString
         """
-        if p[2] == "+":
-            p[0] = p[1] + p[3]
-        else:
-            p[0] = p[1] - p[3]
 
     def p_unary_expression(p):
         """
