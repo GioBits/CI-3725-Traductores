@@ -174,9 +174,11 @@ def main():
     # Desde menor presedencia a mayor y agrupación a izquierda
 
     precedence = (
+        ("left", "TkAnd", "TkOr"),
+        ("left", "TkNEqual", "TkEqual", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
         ("left", "TkPlus", "TkMinus"),
         ("left", "TkMult"),
-        ("right", "TkMinus", "TkNot")  # menos unario
+        ("right", "UMinus", "TkNot")  # menos unario
     )
 
     # Se define símbolo inicial
@@ -189,7 +191,7 @@ def main():
 
     def p_block(p):
         """
-        Block : TkOBlock Secuencing
+        Block : TkOBlock Declare Secuencing TkCBlock
         """
 
     def p_secuencing(p):
@@ -217,6 +219,7 @@ def main():
                     | If
                     | Print
                     | Skip
+                    | empty
         """
 
     def p_asig(p):
@@ -226,32 +229,20 @@ def main():
         """
     def p_writefunction(p):
         """
-        WriteFunction : TkFunction TkOpenPar Literal TwoPoints expression TkClosePar WriteFunction
+        WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar WriteFunction
                      | empty
         TwoPoints : TkTowPoints
         """
+    def p_app(p):
+        """
+        App : expression TkApp expression
+        """
     def p_modificadores_flujo(p):
         """
-        If : TkIf condition Then Instruction Guard TkFi
-        Guard : condition Then Instruction Guard
+        If : TkIf expression Then Instruction Guard TkFi
+        Guard : TkGuard expression Then Instruction Guard
               | empty
-        While : TkWhile condition Then Instruction TkEnd
-        condition : expression Equal expression 
-                  | expression NEqual expression
-                  | expression Leq expression
-                  | expression Less expression
-                  | expression Geq expression
-                  | expression Greater expression
-                  | And condition
-                  | Or condition
-        And : TkAnd
-        Or : TkOr
-        NEqual : TkNEqual
-        Equal : TkEqual
-        Leq : TkLeq
-        Less : TkLess
-        Geq : TkGeq
-        Greater : TkGreater
+        While : TkWhile expression Then Instruction TkEnd
         Then : TkArrow
         """
 
@@ -269,15 +260,33 @@ def main():
         """
         expression : expression Plus expression
                    | expression Minus expression
-                   | expression TkMult expression
-                   | Minus expression
+                   | expression Mult expression
+                   | expression Equal expression 
+                   | expression NEqual expression
+                   | expression Leq expression
+                   | expression Less expression
+                   | expression Geq expression
+                   | expression Greater expression
+                   | expression And expression
+                   | expression Or expression
                    | TkOpenPar expression TkClosePar
                    | Literal
                    | Ident
                    | String
+        And : TkAnd
+        Or : TkOr
+        Mult : TkMult
+        NEqual : TkNEqual
+        Equal : TkEqual
+        Leq : TkLeq
+        Less : TkLess
+        Geq : TkGeq
+        Greater : TkGreater
         Plus : TkPlus
         Minus : TkMinus
         Literal : TkNum
+                | TkTrue
+                | TkFalse
         Ident : TkId
         String : TkString
         """
@@ -286,7 +295,12 @@ def main():
         else:
             p[0] = p[1] - p[3]
 
-    
+    def p_unary_expression(p):
+        """
+        expression : Not expression %prec UMinus
+                   | Minus expression
+        Not : TkNot
+        """
 
     # manejo de errores sintaticos
 
