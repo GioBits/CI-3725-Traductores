@@ -303,10 +303,10 @@ def main():
 
     # constructor del parser
 
-    while True:
-        parser = Yacc.yacc()
-        result = parser.parse(input_data)
-        print(result)
+    
+    parser = Yacc.yacc()
+    result = parser.parse(input_data)
+    print(result)
     
 
 
