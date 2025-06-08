@@ -189,7 +189,13 @@ def main():
         "empty :"
         pass
 
-    def p_block(p):
+    def p_Block(p):
+        """
+        Block : TkOBlock Declare TkCBlock
+        """
+
+    # permite recurción
+    def p_Block_with_secuencing(p):
         """
         Block : TkOBlock Declare Secuencing TkCBlock
         """
@@ -204,15 +210,47 @@ def main():
                    | TkSemicolon Skip
                    | TkSemicolon App
         """
-    def p_declare(p):
+    # permite recursión
+    def p_secuencing_with_secuencing(p):
         """
-        Declare : TkBool Ident Comma Secuencing
-                | TkInt Ident Comma Secuencing
-                | TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma Secuencing
+        Secuencing : TkSemicolon Declare Secuencing
+                   | TkSemicolon Asig Secuencing
+                   | TkSemicolon While Secuencing
+                   | TkSemicolon If Secuencing
+                   | TkSemicolon Print Secuencing
+                   | TkSemicolon Skip Secuencing
+                   | TkSemicolon App Secuencing
+        
+        """
+    def p_declare_int_bool(p):
+        """
+        Declare : TkBool Ident
+                | TkInt Ident
+        """
+    def p_declare_function(p):
+        """
+        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident
+        """
+    # permite recursión
+    def p_declare_int_bool_with_comma(p):
+        """
+        Declare : TkBool Ident Comma
+                | TkInt Ident Comma
+        """
+    # permite recursión
+    def p_declare_function_with_comma(p):
+        """
+        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma
+        """
+    def p_comma(p):
+        """
         Comma : TkComma Ident
-              | empty
         """
-
+    # permite recursión
+    def p_comma_with_comma(p):
+        """
+        Comma : TkComma Ident Comma
+        """
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
@@ -249,6 +287,7 @@ def main():
         """
         Print : TkPrint expression
         """
+        p[0] = [p[0], p[2]]
 
     # estudiar la forma como se expresa esta gramática
     def p_binary_expressions(p):
@@ -263,11 +302,25 @@ def main():
                    | expression Greater termino
                    | expression And termino
                    | expression Or termino
-                   | termino
         termino : termino Mult factor
-                | factor
+        """
+        p[0] = [p[2], p[1], p[3]]
+        
+    def p_unary_expression(p):
+        """
+        expression : Not factor
+                   | Minus factor %prec UMinus
+        Not : TkNot
+        """
+    def p_factor(p):
+        """
         factor : TkOpenPar expression TkClosePar
-               | Literal
+        """
+    def p_subtitutions(p):
+        """
+        expression : termino
+        termino : factor
+        factor : Literal
                | Ident
                | String
         And : TkAnd
@@ -287,13 +340,7 @@ def main():
         Ident : TkId
         String : TkString
         """
-
-    def p_unary_expression(p):
-        """
-        expression : Not factor
-                   | Minus factor %prec UMinus
-        Not : TkNot
-        """
+        p[0] = p[1]
 
     # manejo de errores sintaticos
 
@@ -302,9 +349,9 @@ def main():
 
 
     # constructor del parser
+    parser = Yacc.yacc()
 
     
-    parser = Yacc.yacc()
     result = parser.parse(input_data)
     print(result)
     
