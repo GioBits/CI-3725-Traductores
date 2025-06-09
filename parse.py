@@ -354,7 +354,7 @@ def main():
         
     def p_unary_expression(p):
         """
-        expression : Not factor
+        factor : Not factor
                    | Minus factor %prec UMinus
         Not : TkNot
         """
