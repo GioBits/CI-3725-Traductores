@@ -169,6 +169,9 @@ def main():
     # Etapa2
     #------------------------------------------------
 
+    class Expr(): pass
+
+    class Binary_expressions(Expr):pass
 
     # Se define la presedencia de los operadores
     # Desde menor presedencia a mayor y agrupación a izquierda
@@ -190,12 +193,6 @@ def main():
         pass
 
 
-    def p_Block_prueba(p):
-        """
-        Block : TkOBlock TkCBlock
-        """
-        p[0] = [p[1], p[2]]
-
     def p_Block(p):
         """
         Block : TkOBlock Declare TkCBlock
@@ -206,18 +203,21 @@ def main():
         """
         Block : TkOBlock Declare Secuencing TkCBlock
         """
+        p[0] = [p[1], p[2], p[3], p[4]]
 
     def p_secuencing(p):
         """
         Secuencing : TkSemicolon Declare
                    | TkSemicolon Instruction
         """
+        p[0] = [p[1], p[2]]
     # permite recursión
     def p_secuencing_with_secuencing(p):
         """
         Secuencing : TkSemicolon Declare Secuencing
                    | TkSemicolon Instruction Secuencing 
         """
+        p[0] = [p[1], p[2], p[3]]
     def p_instruction(p):
         """
         Instruction : Asig
@@ -273,27 +273,56 @@ def main():
         p[0] = [p[1], p[2], p[3]]
     def p_writefunction(p):
         """
-        WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar
+        WriteFunction : Ident acceso
+        """
+        p[0] = [p[1], p[2]]
+    def p_acceso_funcion(p):
+        """
+        acceso : TkOpenPar expression TwoPoints expression TkClosePar
+        """
+        p[0] = [p[1], p[2], p[3], p[4], p[5]]
+
+    def p_acceso_funcion_recursivo(p):
+        """
+        acceso : TkOpenPar expression TwoPoints expression TkClosePar acceso
         """
         p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
-    def p_writefunction_recursiva(p):
-        """
-        WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar WriteFunction
-        """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6], p[7]]
+
     def p_app(p):
         """
         App : expression TkApp expression
         """
-    def p_modificadores_flujo(p):
+        p[0] = [p[1], p[2], p[3]]
+    def p_if(p):
+        """
+        If : TkIf expression Then Instruction Guard TkFi
+        """
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+    def p_while(p):
+        """
+        While : TkWhile expression Then Instruction TkEnd
+        """
+        p[0] = [p[1], p[2], p[3], p[4], p[5]]
+    def p_guard(p):
+        """
+        Guard : TkGuard expression Then Instruction
+        """
+        p[0] = [p[1], p[2], p[3], p[4]]
+    def p_guard_recursivo_secuencing(p):
+        """
+        Guard : TkGuard expression Then Asig Secuencing Guard
+        """
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+    def p_guard_empty(p):
+        """
+        Guard : empty
+        """
+        p[0] = p[1]
+    def p_if_secuencing(p):
         """
         If : TkIf expression Then Instruction Secuencing Guard TkFi
-        Guard : TkGuard expression Then Asig Guard
-              | empty
-        While : TkWhile expression Then Asig TkEnd
-        Then : TkArrow
         """
-
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6], p[7]]
     def p_skip(p):
         """
         Skip : TkSkip
@@ -359,6 +388,7 @@ def main():
         Ident : TkId
         String : TkString
         TwoPoints : TkTowPoints
+        Then : TkArrow
         """
         p[0] = p[1]
 
@@ -372,7 +402,7 @@ def main():
     parser = Yacc.yacc()
 
     
-    result = parser.parse("{ bool a, b }")
+    result = parser.parse("{ int a; bool b}")
     print(result)
     
 
