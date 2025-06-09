@@ -225,7 +225,6 @@ def main():
                     | If
                     | Print
                     | Skip
-                    | App
         """
         p[0] = p[1]
 
@@ -288,11 +287,6 @@ def main():
         """
         p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
 
-    def p_app(p):
-        """
-        App : expression TkApp expression
-        """
-        p[0] = [p[1], p[2], p[3]]
     def p_if(p):
         """
         If : TkIf expression Then Instruction Guard TkFi
@@ -348,6 +342,7 @@ def main():
                    | expression Greater termino
                    | expression And termino
                    | expression Or termino
+                   | expression TkApp termino
         termino : termino Mult factor
         """
         p[0] = [p[2], p[1], p[3]]
@@ -355,8 +350,7 @@ def main():
     def p_unary_expression(p):
         """
         factor : Not factor
-               | Minus factor %prec UMinus
-        Not : TkNot
+                | Minus factor %prec UMinus
         """
         p[0] = [p[1], p[2]]
     def p_factor(p):
@@ -364,6 +358,9 @@ def main():
         factor : TkOpenPar expression TkClosePar
         """
         p[0] = [p[1], p[2], p[3]]
+
+
+
     def p_subtitutions(p):
         """
         expression : termino
@@ -389,6 +386,7 @@ def main():
         String : TkString
         TwoPoints : TkTowPoints
         Then : TkArrow
+        Not : TkNot
         """
         p[0] = p[1]
 
@@ -401,8 +399,16 @@ def main():
     # constructor del parser
     parser = Yacc.yacc()
 
-    
-    result = parser.parse("{ int a; bool b}")
+    prueba = """
+                {
+                    int min, max;
+                    function[..2] A;
+                    if A.0  -->
+                        a := 1
+                    fi
+                }
+                """
+    result = parser.parse(input_data)
     print(result)
     
 
