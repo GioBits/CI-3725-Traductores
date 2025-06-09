@@ -189,11 +189,18 @@ def main():
         "empty :"
         pass
 
+
+    def p_Block_prueba(p):
+        """
+        Block : TkOBlock TkCBlock
+        """
+        p[0] = [p[1], p[2]]
+
     def p_Block(p):
         """
         Block : TkOBlock Declare TkCBlock
         """
-
+        p[0] = [p[1], p[2], p[3]]
     # permite recurción
     def p_Block_with_secuencing(p):
         """
@@ -203,76 +210,84 @@ def main():
     def p_secuencing(p):
         """
         Secuencing : TkSemicolon Declare
-                   | TkSemicolon Asig
-                   | TkSemicolon While
-                   | TkSemicolon If
-                   | TkSemicolon Print
-                   | TkSemicolon Skip
-                   | TkSemicolon App
+                   | TkSemicolon Instruction
         """
     # permite recursión
     def p_secuencing_with_secuencing(p):
         """
         Secuencing : TkSemicolon Declare Secuencing
-                   | TkSemicolon Asig Secuencing
-                   | TkSemicolon While Secuencing
-                   | TkSemicolon If Secuencing
-                   | TkSemicolon Print Secuencing
-                   | TkSemicolon Skip Secuencing
-                   | TkSemicolon App Secuencing
-        
+                   | TkSemicolon Instruction Secuencing 
         """
+    def p_instruction(p):
+        """
+        Instruction : Asig
+                    | While
+                    | If
+                    | Print
+                    | Skip
+                    | App
+        """
+        p[0] = p[1]
+
     def p_declare_int_bool(p):
         """
         Declare : TkBool Ident
                 | TkInt Ident
         """
+        p[0] = [p[1], p[2]]
+
     def p_declare_function(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident
         """
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
     # permite recursión
     def p_declare_int_bool_with_comma(p):
         """
         Declare : TkBool Ident Comma
                 | TkInt Ident Comma
         """
+        p[0] = [p[1], p[2], p[3]]
     # permite recursión
     def p_declare_function_with_comma(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma
         """
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6], p[7]]
     def p_comma(p):
         """
         Comma : TkComma Ident
         """
+        p[0] = [p[1], p[2]]
     # permite recursión
     def p_comma_with_comma(p):
         """
         Comma : TkComma Ident Comma
         """
+        p[0] = [p[1], p[2], p[3]]
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
              | Ident TkAsig WriteFunction
         """
+        p[0] = [p[1], p[2], p[3]]
     def p_writefunction(p):
         """
-        WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar WriteFunction
-                      | empty
-        TwoPoints : TkTowPoints
+        WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar
         """
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+    def p_writefunction_recursiva(p):
+        """
+        WriteFunction : TkFunction TkOpenPar expression TwoPoints expression TkClosePar WriteFunction
+        """
+        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6], p[7]]
     def p_app(p):
         """
         App : expression TkApp expression
         """
     def p_modificadores_flujo(p):
         """
-        If : TkIf expression Then Asig Secuencing Guard TkFi
-           | TkIf expression Then While Secuencing Guard TkFi
-           | TkIf expression Then If Secuencing Guard TkFi
-           | TkIf expression Then Print Secuencing Guard TkFi
-           | TkIf expression Then Skip Secuencing Guard TkFi
+        If : TkIf expression Then Instruction Secuencing Guard TkFi
         Guard : TkGuard expression Then Asig Guard
               | empty
         While : TkWhile expression Then Asig TkEnd
@@ -283,6 +298,8 @@ def main():
         """
         Skip : TkSkip
         """
+        p[0] = p[1]
+
     def p_print(p):
         """
         Print : TkPrint expression
@@ -312,10 +329,12 @@ def main():
                    | Minus factor %prec UMinus
         Not : TkNot
         """
+        p[0] = [p[1], p[2]]
     def p_factor(p):
         """
         factor : TkOpenPar expression TkClosePar
         """
+        p[0] = [p[1], p[2], p[3]]
     def p_subtitutions(p):
         """
         expression : termino
@@ -339,6 +358,7 @@ def main():
                 | TkFalse
         Ident : TkId
         String : TkString
+        TwoPoints : TkTowPoints
         """
         p[0] = p[1]
 
@@ -352,7 +372,7 @@ def main():
     parser = Yacc.yacc()
 
     
-    result = parser.parse(input_data)
+    result = parser.parse("{ bool a, b }")
     print(result)
     
 
