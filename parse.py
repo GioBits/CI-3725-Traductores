@@ -355,7 +355,7 @@ def main():
     def p_unary_expression(p):
         """
         factor : Not factor
-                   | Minus factor %prec UMinus
+               | Minus factor %prec UMinus
         Not : TkNot
         """
         p[0] = [p[1], p[2]]
