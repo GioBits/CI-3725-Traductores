@@ -169,7 +169,24 @@ def main():
     # Etapa2
     #------------------------------------------------
 
+
+
+    class Block():
+        def __init__(self,type = None, lefson = None, rightson = None, op = None):
+            self.type = type
+            self.lefson = lefson
+            self.rightson = rightson
+            self.op = op
+
+    class Declare(Block): pass
+    class Secuencing(Block):pass
+    class Asig(Block): pass
+    class If(Block): pass
+    class Gruar(Block): pass
+    class While(Block): pass
+    class Literal(Block): pass
     class Expr(): pass
+
 
     class Binary_expressions(Expr):pass
 
@@ -195,29 +212,23 @@ def main():
 
     def p_Block(p):
         """
-        Block : TkOBlock Declare TkCBlock
+        Block : TkOBlock Secuencing TkCBlock
         """
-        p[0] = [p[1], p[2], p[3]]
+        p[0] = Block("Block", p[2], None, None)
     # permite recurción
-    def p_Block_with_secuencing(p):
+    def p_Block_DeclareSection(p):
         """
-        Block : TkOBlock Declare Secuencing TkCBlock
+        Block : TkOBlock DeclareSection Secuencing TkCBlock
         """
-        p[0] = [p[1], p[2], p[3], p[4]]
+        p[0] = Block("Block", p[2], None, None)
 
     def p_secuencing(p):
         """
-        Secuencing : TkSemicolon Declare
-                   | TkSemicolon Instruction
+        Secuencing : Secuencing TkSemicolon Instruction
+                   | Instruction
         """
-        p[0] = [p[1], p[2]]
-    # permite recursión
-    def p_secuencing_with_secuencing(p):
-        """
-        Secuencing : TkSemicolon Declare Secuencing
-                   | TkSemicolon Instruction Secuencing 
-        """
-        p[0] = [p[1], p[2], p[3]]
+        p[0] = Secuencing()
+
     def p_instruction(p):
         """
         Instruction : Asig
@@ -225,7 +236,25 @@ def main():
                     | If
                     | Print
                     | Skip
+                    | Block
         """
+        p[0] = p[1]
+
+    def p_declare_section(p):
+        """
+        DeclareSection : SecuencingDeclare
+        """
+        p[0] = "Declare"
+
+    def p_secuencing_declare_recursivo(p):
+        """
+        SecuencingDeclare : Declare TkSemicolon SecuencingDeclare
+        """
+    def p_secuencing_declare(p):
+        """
+        SecuencingDeclare : Declare TkSemicolon
+        """
+
         p[0] = p[1]
 
     def p_declare_int_bool(p):
@@ -234,6 +263,7 @@ def main():
                 | TkInt Ident
         """
         p[0] = [p[1], p[2]]
+
 
     def p_declare_function(p):
         """
@@ -302,21 +332,12 @@ def main():
         Guard : TkGuard expression Then Instruction
         """
         p[0] = [p[1], p[2], p[3], p[4]]
-    def p_guard_recursivo_secuencing(p):
-        """
-        Guard : TkGuard expression Then Asig Secuencing Guard
-        """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
     def p_guard_empty(p):
         """
         Guard : empty
         """
         p[0] = p[1]
-    def p_if_secuencing(p):
-        """
-        If : TkIf expression Then Instruction Secuencing Guard TkFi
-        """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6], p[7]]
+
     def p_skip(p):
         """
         Skip : TkSkip
@@ -401,16 +422,33 @@ def main():
 
     prueba = """
                 {
-                    int min, max;
-                    function[..2] A;
-                    if A.0  -->
-                        a := 1
-                    fi
+                    int a; bool b
                 }
                 """
-    result = parser.parse(input_data)
-    print(result)
+    result = parser.parse(prueba)
     
+
+    
+    #print(current.rightson)
+    
+    
+
+    
+def imprimir_ast(arbol, n):
+
+    current = arbol
+    space = n
+    operation = None
+
+    if current != None:
+        print("-"*n+f"{current.op}")
+        rightson = current.rightson
+        if rightson != None:
+            operation = imprimir_ast(rightson, n)
+
+
+
+
 
 
 if __name__ == "__main__":
