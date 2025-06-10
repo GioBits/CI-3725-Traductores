@@ -185,7 +185,7 @@ def main():
     class Gruar(Block): pass
     class While(Block): pass
     class Literal(Block): pass
-    class Expr(): pass
+    class Expr(Block): pass
 
 
     class Binary_expressions(Expr):pass
@@ -214,20 +214,31 @@ def main():
         """
         Block : TkOBlock Secuencing TkCBlock
         """
-        p[0] = Block("Block", p[2], None, None)
+        p[0] = ["Block", p[2]]
     # permite recurción
     def p_Block_DeclareSection(p):
         """
         Block : TkOBlock DeclareSection Secuencing TkCBlock
         """
-        p[0] = Block("Block", p[2], None, None)
+        p[0] = ["Block", p[2], p[3]]
+
+    def p_Block_DeclareSection_only(p):
+        """
+        Block : TkOBlock DeclareSection TkCBlock
+        """
+        p[0] = ["Block", p[2]]
 
     def p_secuencing(p):
         """
         Secuencing : Secuencing TkSemicolon Instruction
-                   | Instruction
         """
-        p[0] = Secuencing()
+        p[0] = ["Secuencing", p[1], p[3]]
+
+    def p_secuencing(p):
+        """
+        Secuencing : Instruction
+        """
+        p[0] = p[1]
 
     def p_instruction(p):
         """
@@ -244,17 +255,18 @@ def main():
         """
         DeclareSection : SecuencingDeclare
         """
-        p[0] = "Declare"
+        p[0] = ["Declare", p[1]]
 
     def p_secuencing_declare_recursivo(p):
         """
         SecuencingDeclare : Declare TkSemicolon SecuencingDeclare
         """
+        p[0] = ["Secuencing", p[1], p[3]]
+
     def p_secuencing_declare(p):
         """
         SecuencingDeclare : Declare TkSemicolon
         """
-
         p[0] = p[1]
 
     def p_declare_int_bool(p):
@@ -262,27 +274,27 @@ def main():
         Declare : TkBool Ident
                 | TkInt Ident
         """
-        p[0] = [p[1], p[2]]
+        p[0] = [p[2], p[1]]
 
 
     def p_declare_function(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+        p[0] = ["WriteFunction", p[6], p[1], p[2], p[3], p[4], p[5]]
     # permite recursión
     def p_declare_int_bool_with_comma(p):
         """
         Declare : TkBool Ident Comma
                 | TkInt Ident Comma
         """
-        p[0] = [p[1], p[2], p[3]]
+        p[0] = [p[1], p[2]] + p[3]
     # permite recursión
     def p_declare_function_with_comma(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6], p[7]]
+        p[0] = ["WriteFunction", p[6]] + p[7] + [p[1], p[2], p[3], p[4], p[5]] 
     def p_comma(p):
         """
         Comma : TkComma Ident
@@ -422,16 +434,25 @@ def main():
 
     prueba = """
                 {
-                    int a; bool b
+                    int b;
                 }
                 """
     result = parser.parse(prueba)
     
+    n = 0
+    
+    print(result)
+    print("-"*n+f"{result[0]}")
+    n += 1
+    print("-"*n+f"{result[1][0]}")
+    n += 1
+    
 
-    
+
     #print(current.rightson)
+    #imprimir_ast(result, 0)
     
-    
+
 
     
 def imprimir_ast(arbol, n):
@@ -441,10 +462,12 @@ def imprimir_ast(arbol, n):
     operation = None
 
     if current != None:
-        print("-"*n+f"{current.op}")
+        print("-"*space+f"{current.type}")
         rightson = current.rightson
-        if rightson != None:
-            operation = imprimir_ast(rightson, n)
+        leftson = current.leftson
+    
+        imprimir_ast(rightson, n+1)
+        imprimir_ast(leftson, n+1)
 
 
 
