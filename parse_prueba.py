@@ -209,6 +209,7 @@ def main():
         ("left", "TkNEqual", "TkEqual", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
         ("left", "TkPlus", "TkMinus"),
         ("left", "TkMult"),
+        ("left", "TkApp"),
         ("right", "UMinus", "TkNot")  # menos unario
     )
 
@@ -333,16 +334,20 @@ def main():
 
     def p_acceso_funcion_recursivo(p):
         """
-        acceso : TkOpenPar expression TwoPoints expression TkClosePar acceso
+        acceso : TkOpenPar TwoPoints TkClosePar acceso
         """
         p[0] = TwoPoints("TwoPoints", p[2], p[4])
         #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
 
+    def p_twopoints(p):
+        """
+        TwoPoints : expression TkTwoPoints expression
+        """
     def p_if(p):
         """
         If : TkIf Then TkFi
         """
-        p[0] = If("If", p[3])
+        p[0] = If("If", p[2])
         #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
     def p_if_guard(p):
         """
@@ -352,7 +357,7 @@ def main():
     
     def p_then(p):
         """
-        Then : expression TkArrow Instruction
+        Then : expression TkArrow Sequencing
         """
         p[0] = Then("Then",p[1], p[3])
     def p_while(p):
@@ -409,8 +414,8 @@ def main():
                  | termino1 TkGreater termino2
         termino2 : termino2 TkPlus termino3
                  | termino2 TkMinus termino3 
-                 | termino2 TkApp termino3
-        termino3 : termino3 TkMult factor
+        termino3 : termino3 TkMult termino4
+        termino4 : termino4 TkApp factor
 
         """
         if p[2] == "+":
@@ -460,7 +465,8 @@ def main():
         termino0 : termino1
         termino1 : termino2
         termino2 : termino3
-        termino3 : factor
+        termino3 : termino4
+        termino4 : factor
         factor : Literal
                | Ident
                | String
@@ -510,7 +516,7 @@ def main():
     prueba = """
                 {
                     int a;
-                    a := 10+2+-34*-100*2-1-0
+                    a := A.2+-B.1*A(2:3).2
                 }
                 """
     result = parser.parse(input_data)
