@@ -128,10 +128,10 @@ class GuardNode(Node):
 
     def __str__(self, current_level=0):
         ret = "-" * current_level + "Guard\n"
-        ret += self.condition.__str__(current_level + 1)
-        ret += ThenNode(self.instruction_list).__str__(current_level + 1)
         if self.next_guard:
             ret += self.next_guard.__str__(current_level + 1) # Imprime recursivamente el siguiente guard a mayor nivel
+        ret += self.condition.__str__(current_level + 1)
+        ret += ThenNode(self.instruction_list).__str__(current_level + 1)
         return ret
 
 class ThenNode(Node):
