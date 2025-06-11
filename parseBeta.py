@@ -688,18 +688,6 @@ def main():
         else: # Operador unario, pasa el valor crudo del token
             p[0] = UnaryOpNode(p[1], p[2])
 
-    # def p_primary(p):
-    #     """
-    #     Primary : Literal
-    #             | Ident
-    #             | String
-    #             | TkOpenPar Expression TkClosePar
-    #             | AppExpression
-    #     """
-    #     if len(p) == 2:
-    #         p[0] = p[1]
-    #     else: # TkOpenPar Expression TkClosePar
-    #         p[0] = p[2]
     def p_primary(p):
         """
         Primary : Literal
@@ -707,25 +695,17 @@ def main():
                 | String
                 | TkOpenPar Expression TkClosePar
                 | AppExpression
-                | WriteFunction   # Añadir WriteFunction a Primary
         """
         if len(p) == 2:
             p[0] = p[1]
         else: # TkOpenPar Expression TkClosePar
             p[0] = p[2]
 
-    def p_app_expression(p): # Renombrar para ser más genérico
+    def p_app_expression_literal(p):
         """
-        AppExpression : Primary TkApp Literal
-                      | Primary TkApp Ident
+        AppExpression : Ident TkApp Literal
         """
         p[0] = AppNode(p[1], p[3])
-
-    # def p_app_expression_literal(p):
-    #     """
-    #     AppExpression : Ident TkApp Literal
-    #     """
-    #     p[0] = AppNode(p[1], p[3])
 
     def p_app_expression_ident(p):
         """
