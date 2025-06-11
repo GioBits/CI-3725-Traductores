@@ -179,30 +179,33 @@ def main():
 
 
     class DeclareSection(Block): pass
-    class Secuencing(Block):pass
-
-    class SecuencingDeclare(Block): pass
-
+    class Sequencing(Block):pass
+    class SequencingDeclare(Block): pass
     class Declare(Block): pass
-
     class WriteFunction(Block): pass
-
-    
     class Asig(Block): pass
     class If(Block): pass
-
     class While(Block): pass
     class Literal(Block): pass
     class Expr(Block): pass
-
-
     class Binary_expressions(Block):pass
+    class Literal(Block):pass
+    class Ident(Block): pass
+    class String(Block):pass
+    class UExpresson(Block): pass
+    class Print(Block): pass
+    class Skip(Block): pass
+    class Guard(Block): pass
+    class Then(Block): pass
+    class TwoPoints(Block): pass
+
 
     # Se define la presedencia de los operadores
     # Desde menor presedencia a mayor y agrupación a izquierda
 
     precedence = (
-        ("left", "TkAnd", "TkOr"),
+        ("left", "TkOr"),
+        ("left", "TkAnd"),
         ("left", "TkNEqual", "TkEqual", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
         ("left", "TkPlus", "TkMinus"),
         ("left", "TkMult"),
@@ -216,20 +219,20 @@ def main():
     # permite recurción
     def p_Block(p):
         """
-        Block : TkOBlock DeclareSection Secuencing TkCBlock
+        Block : TkOBlock DeclareSection Sequencing TkCBlock
         """
         p[0] = Block("Block", p[2], p[3])
 
-    def p_secuencing(p):
+    def p_sequencing(p):
         """
-        Secuencing : Secuencing TkSemicolon Instruction
+        Sequencing : Sequencing TkSemicolon Instruction
         """
-        p[0] = Secuencing("Secuencing", p[1], p[3])
-        #p[0] = ["Secuencing", p[1], p[3]]
+        p[0] = Sequencing("Sequencing", p[1], p[3])
 
-    def p_secuencing_only(p):
+
+    def p_sequencing_only(p):
         """
-        Secuencing : Instruction
+        Sequencing : Instruction
         """
         p[0] = p[1]
 
@@ -246,21 +249,21 @@ def main():
 
     def p_declare_section(p):
         """
-        DeclareSection : SecuencingDeclare
+        DeclareSection : SequencingDeclare
         """
         p[0] = DeclareSection("Declare", p[1])
-        #p[0] = ["Declare", p[1]]
 
-    def p_secuencing_declare_recursivo(p):
-        """
-        SecuencingDeclare : Declare TkSemicolon SecuencingDeclare
-        """
-        p[0] = SecuencingDeclare("Secuencing", p[1], p[3])
-        #p[0] = ["Secuencing", p[1], p[3]]
 
-    def p_secuencing_declare(p):
+    def p_sequencing_declare_recursivo(p):
         """
-        SecuencingDeclare : Declare TkSemicolon
+        SequencingDeclare : Declare TkSemicolon SequencingDeclare
+        """
+        p[0] = SequencingDeclare("Sequencing", p[1], p[3])
+
+
+    def p_sequencing_declare(p):
+        """
+        SequencingDeclare : Declare TkSemicolon
         """
         p[0] = p[1]
 
@@ -270,7 +273,7 @@ def main():
                 | TkInt TkId
         """
         p[0] = Declare(p[2] + " : " + p[1])
-        #p[0] = [p[2], p[1]]
+
 
 
     def p_declare_function(p):
@@ -278,7 +281,7 @@ def main():
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId
         """
         p[0] = Declare(p[6] + " : " + "function[.." + p[4].op + "]")
-        #p[0] = ["function", p[6], p[1], p[2], p[3], p[4], p[5]]
+
     # permite recursión
     def p_declare_int_bool_with_comma(p):
         """
@@ -286,44 +289,41 @@ def main():
                 | TkInt TkId Comma
         """
         p[0] = Declare(p[2] + p[3] + " : " + p[1])
-        #p[0] = [p[1], p[2]] + p[3]
     # permite recursión
     def p_declare_function_with_comma(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId Comma
         """
         p[0] = Declare(p[6] + p[7] + " : " + "function[.." + p[4].op + "]")
-        #p[0] = ["WriteFunction", p[6]] + p[7] + [p[1], p[2], p[3], p[4], p[5]] 
     def p_comma(p):
         """
         Comma : TkComma TkId
         """
-        p[0] = " " + p[1] + " " + p[2]
+        p[0] = p[1] + " " + p[2]
     # permite recursión
     def p_comma_with_comma(p):
         """
         Comma : TkComma TkId Comma
         """
-        p[0] = " " + p[1] + " " + p[2] + " " + p[3]
+        p[0] = p[1] + " " + p[2] +  p[3]
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
              | Ident TkAsig WriteFunction
         """
         p[0] = Asig("Asig", p[1], p[3])
-        #p[0] = [p[1], p[2], p[3]]
+
     def p_writefunction(p):
         """
         WriteFunction : Ident acceso
         """
         p[0] = WriteFunction("WriteFunction", p[1], p[2])
-        #p[0] = [p[1], p[2]]
 
 
 
 
     #REvisarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
-    class TwoPoints(Block): pass
+
     def p_acceso_funcion(p):
         """
         acceso : TkOpenPar expression TwoPoints expression TkClosePar
@@ -340,12 +340,16 @@ def main():
 
     def p_if(p):
         """
+        If : TkIf Then TkFi
+        """
+        p[0] = If("If", p[3])
+        #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+    def p_if_guard(p):
+        """
         If : TkIf Then Guard TkFi
         """
-        p[0] = IF("If", p[3], p[2])
-        #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
-
-    class Then(Block): pass
+        p[0] = If("If", p[3], p[2])
+    
     def p_then(p):
         """
         Then : expression TkArrow Instruction
@@ -358,7 +362,7 @@ def main():
         p[0] = While("While", p[2])
         #p[0] = [p[1], p[2], p[3], p[4], p[5]]
 
-    class Guard(Block): pass
+    
     def p_guard_recursivo(p):
         """
         Guard : TkGuard Then Guard
@@ -376,7 +380,7 @@ def main():
 
 
     #----------------------------------------------
-    class Skip(Block): pass
+    
     def p_skip(p):
         """
         Skip : TkSkip
@@ -384,87 +388,89 @@ def main():
         p[0] = Skip("Skip")
         #p[0] = p[1]
 
-    class Print(Block): pass
+    
 
     def p_print(p):
         """
         Print : TkPrint expression
         """
         p[0] = Print("Print", p[2])
-        #p[0] = [p[0], p[2]]
 
     # estudiar la forma como se expresa esta gramática
     def p_binary_expressions(p):
         """
-        expression : expression TkPlus termino
-                   | expression TkMinus termino
-                   | expression TkEqual termino 
-                   | expression TkNEqual termino
-                   | expression TkLeq termino
-                   | expression TkLess termino
-                   | expression TkGeq termino
-                   | expression TkGreater termino
-                   | expression TkAnd termino
-                   | expression TkOr termino
-                   | expression TkApp termino
-        termino : termino TkMult factor
-        """
-        if p[2] == "TkPlus":
-            p[0] = Binary_expressions("Plus", p[1], p[3])
-        elif p[2] == "TkMinus":
-            p[0] = Binary_expressions("Minus", p[1], p[3])
-        elif p[2] == "TkEqual":
-            p[0] = Binary_expressions("Equal", p[1], p[3])
-        elif p[2] == "TkNEqual":
-            p[0] = Binary_expressions("NEqual", p[1], p[3])
-        elif p[2] == "TkLeq":
-            p[0] = Binary_expressions("Leq", p[1], p[3])
-        elif p[2] == "TkLess":
-            p[0] = Binary_expressions("Less", p[1], p[3])
-        elif p[2] == "TkGeq":
-            p[0] = Binary_expressions("Geq", p[1], p[3])
-        elif p[2] == "TkGreater":
-            p[0] = Binary_expressions("TkGreater", p[1],p[3])
-        elif p[2] == "TkAnd":
-            p[0] = Binary_expressions("And", p[1], p[3])
-        elif p[2] == "TkApp":
-            p[0] = Binary_expressions("App", p[1], p[3])
-        elif p[2] == "TkMult":
-            p[0] = Binary_expressions("Mult", p[1], p[3])
-        elif p[0] == "TkOr":
-            p[0] = Binary_expressions("Or", p[1], p[3])
+        expression : expression TkOr termino0
+        termino0 : termino0 TkAnd termino1
+        termino1 : termino1 TkEqual termino2
+                 | termino1 TkNEqual termino2
+                 | termino1 TkLeq termino2
+                 | termino1 TkLess termino2
+                 | termino1 TkGeq termino2
+                 | termino1 TkGreater termino2
+        termino2 : termino2 TkPlus termino3
+                 | termino2 TkMinus termino3 
+                 | termino2 TkApp termino3
+        termino3 : termino3 TkMult factor
 
-        #p[0] = [p[2], p[1], p[3]]
-    class UExpresson(Block): pass
+        """
+        if p[2] == "+":
+            p[0] = Binary_expressions("Plus", p[1], p[3])
+        elif p[2] == "-":
+            p[0] = Binary_expressions("Minus", p[1], p[3])
+        elif p[2] == "and":
+            p[0] = Binary_expressions("And", p[1], p[3])
+        elif p[2] == ".":
+            p[0] = Binary_expressions("App", p[1], p[3])
+        elif p[2] == "*":
+            p[0] = Binary_expressions("Mult", p[1], p[3])
+        elif p[2] == "or":
+            p[0] = Binary_expressions("Or", p[1], p[3])
+        elif p[2] == "==":
+            p[0] = Binary_expressions("Equal", p[1], p[3])
+        elif p[2] == "<>":
+            p[0] = Binary_expressions("NotEqual", p[1], p[3])
+        elif p[2] == "<=":
+            p[0] = Binary_expressions("Leq", p[1], p[3])
+        elif p[2] == "<":
+            p[0] = Binary_expressions("Less", p[1], p[3])
+        elif p[2] == ">=":
+            p[0] = Binary_expressions("Geq", p[1], p[3])
+        elif p[2] == ">":
+            p[0] = Binary_expressions("Greater", p[1],p[3])
+
+    
     def p_unary_expression(p):
         """
         factor : TkNot factor
                 | TkMinus factor %prec UMinus
         """
-        p[0] = UExpresson(p[0]+p[1])
-        p[0] = [p[1], p[2]]
+        if p[1] == "!":
+            p[0] = UExpresson("Not", p[2])
+        elif p[1] =="-":
+            p[0] = UExpresson("Minus", p[2])
     def p_factor(p):
         """
         factor : TkOpenPar expression TkClosePar
         """
         p[0] = p[2]
 
-
-
     def p_subtitutions(p):
         """
-        expression : termino
-        termino : factor
+        expression : termino0
+        termino0 : termino1
+        termino1 : termino2
+        termino2 : termino3
+        termino3 : factor
         factor : Literal
-               | TkId
+               | Ident
                | String
         TwoPoints : TkTwoPoints
         """
         p[0] = p[1]
 
-    class String(Block):pass
+    
 
-    class Ident(Block): pass
+    
     def p_ident(p):
         """
         Ident : TkId
@@ -477,7 +483,7 @@ def main():
         p[0] = String("String: "+p[1])
 
     # manejo de errores sintaticos
-    class Literal(Block):pass
+    
     def p_literal(p):
         """
         Literal : TkNum
@@ -487,7 +493,15 @@ def main():
         p[0] = Literal("Literal: " + str(p[1]))
 
     def p_error(p):
-        print("Sintax error")
+        if p:
+            column = p.lexpos - p.lexer.lexdata.rfind('\n', 0, p.lexpos)
+            if column <= 0: # Ajustar para casos donde el token está al inicio de línea
+                column = p.lexpos + 1
+            print(f"Sintax error in row {p.lineno}, column {column}: unexpected token '{p.value}'")
+        else:
+            print("Syntax error at EOF")
+        sys.exit(1)
+
 
 
     # constructor del parser
@@ -496,26 +510,13 @@ def main():
     prueba = """
                 {
                     int a;
-                    a := 10+2
+                    a := 10+2+-34*-100*2-1-0
                 }
                 """
-    result = parser.parse(prueba)
+    result = parser.parse(input_data)
 
-    #print(result.leftson.leftson.op)
     imprimir_ast(result,0)
     
-    #n = 0
-    
-    """print(result)
-                print("-"*n+f"{result[0]}")
-                n += 1
-                print("-"*n+f"{result[1][0]}")
-                n += 1"""
-    
-
-
-    #print(current.rightson)
-    #imprimir_ast(result, 0)
     
 
 def imprimir_ast( arbol , n):
@@ -525,28 +526,10 @@ def imprimir_ast( arbol , n):
 
     if current != None:
         print("-"*nivel+f"{current.op}")
-        if current.leftson != None:
-            imprimir_ast( current.leftson, nivel+1)
-        if current.rightson != None:
-            imprimir_ast( current.rightson, nivel+1)
-    
-def imprimir_ast2(arbol, n):
-
-    current = arbol
-    space = n
-    operation = None
-
-    if current != None:
-        print("-"*space+f"{current.type}")
-        rightson = current.rightson
-        leftson = current.leftson
-    
-        imprimir_ast(rightson, n+1)
-        imprimir_ast(leftson, n+1)
-
-
-
-
+        
+        imprimir_ast( current.leftson, nivel+1)
+        
+        imprimir_ast( current.rightson, nivel+1)
 
 
 if __name__ == "__main__":
