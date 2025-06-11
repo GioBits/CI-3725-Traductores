@@ -172,14 +172,22 @@ def main():
 
 
     class Block():
-        def __init__(self,type = None, lefson = None, rightson = None, op = None):
-            self.type = type
-            self.lefson = lefson
-            self.rightson = rightson
+        def __init__(self,op = None, leftson = None, rightson = None):
             self.op = op
+            self.leftson = leftson
+            self.rightson = rightson
+
+
+    class DeclareSection(Block): pass
+    class Secuencing(Block):pass
+
+    class SecuencingDeclare(Block): pass
 
     class Declare(Block): pass
-    class Secuencing(Block):pass
+
+    class WriteFunction(Block): pass
+
+    
     class Asig(Block): pass
     class If(Block): pass
     class Gruar(Block): pass
@@ -209,32 +217,21 @@ def main():
         "empty :"
         pass
 
-
-    def p_Block(p):
-        """
-        Block : TkOBlock Secuencing TkCBlock
-        """
-        p[0] = ["Block", p[2]]
     # permite recurción
-    def p_Block_DeclareSection(p):
+    def p_Block(p):
         """
         Block : TkOBlock DeclareSection Secuencing TkCBlock
         """
-        p[0] = ["Block", p[2], p[3]]
-
-    def p_Block_DeclareSection_only(p):
-        """
-        Block : TkOBlock DeclareSection TkCBlock
-        """
-        p[0] = ["Block", p[2]]
+        p[0] = Block("Block", p[2], p[3])
 
     def p_secuencing(p):
         """
         Secuencing : Secuencing TkSemicolon Instruction
         """
-        p[0] = ["Secuencing", p[1], p[3]]
+        p[0] = Secuencing("Secuencing", p[1], p[3])
+        #p[0] = ["Secuencing", p[1], p[3]]
 
-    def p_secuencing(p):
+    def p_secuencing_only(p):
         """
         Secuencing : Instruction
         """
@@ -255,13 +252,15 @@ def main():
         """
         DeclareSection : SecuencingDeclare
         """
-        p[0] = ["Declare", p[1]]
+        p[0] = DeclareSection("Declare", p[1])
+        #p[0] = ["Declare", p[1]]
 
     def p_secuencing_declare_recursivo(p):
         """
         SecuencingDeclare : Declare TkSemicolon SecuencingDeclare
         """
-        p[0] = ["Secuencing", p[1], p[3]]
+        p[0] = SecuencingDeclare("Secuencing", p[1], p[3])
+        #p[0] = ["Secuencing", p[1], p[3]]
 
     def p_secuencing_declare(p):
         """
@@ -274,21 +273,24 @@ def main():
         Declare : TkBool Ident
                 | TkInt Ident
         """
-        p[0] = [p[2], p[1]]
+        p[0] = Declare(p[2] + " : " + p[1])
+        #p[0] = [p[2], p[1]]
 
 
     def p_declare_function(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident
         """
-        p[0] = ["WriteFunction", p[6], p[1], p[2], p[3], p[4], p[5]]
+        p[0] = Declare(p[6] + " : " + "function[.." + p[4].op + "]")
+        #p[0] = ["function", p[6], p[1], p[2], p[3], p[4], p[5]]
     # permite recursión
     def p_declare_int_bool_with_comma(p):
         """
         Declare : TkBool Ident Comma
                 | TkInt Ident Comma
         """
-        p[0] = [p[1], p[2]] + p[3]
+        p[0] = Declare(p[2] + p[3] + " : " + p[1])
+        #p[0] = [p[1], p[2]] + p[3]
     # permite recursión
     def p_declare_function_with_comma(p):
         """
@@ -299,13 +301,13 @@ def main():
         """
         Comma : TkComma Ident
         """
-        p[0] = [p[1], p[2]]
+        p[0] = " " + p[1] + " " + p[2]
     # permite recursión
     def p_comma_with_comma(p):
         """
         Comma : TkComma Ident Comma
         """
-        p[0] = [p[1], p[2], p[3]]
+        p[0] = " " + p[1] + " " + p[2] + " " + p[3]
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
@@ -412,9 +414,6 @@ def main():
         Greater : TkGreater
         Plus : TkPlus
         Minus : TkMinus
-        Literal : TkNum
-                | TkTrue
-                | TkFalse
         Ident : TkId
         String : TkString
         TwoPoints : TkTowPoints
@@ -424,6 +423,14 @@ def main():
         p[0] = p[1]
 
     # manejo de errores sintaticos
+    class Literal(Block):pass
+    def p_literal(p):
+        """
+        Literal : TkNum
+                | TkTrue
+                | TkFalse
+        """
+        p[0] = Literal("Literal: " + str(p[1]))
 
     def p_error(p):
         print("Sintax error")
@@ -434,18 +441,21 @@ def main():
 
     prueba = """
                 {
-                    int b;
+                    int d, b, s, c, g;
+                    b := 5
                 }
                 """
     result = parser.parse(prueba)
+
+    print(result.leftson.leftson.op)
     
-    n = 0
+    #n = 0
     
-    print(result)
-    print("-"*n+f"{result[0]}")
-    n += 1
-    print("-"*n+f"{result[1][0]}")
-    n += 1
+    """print(result)
+                print("-"*n+f"{result[0]}")
+                n += 1
+                print("-"*n+f"{result[1][0]}")
+                n += 1"""
     
 
 
