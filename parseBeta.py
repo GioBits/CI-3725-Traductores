@@ -1,7 +1,7 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
 # Date: June 11, 2025 (Updated)
 # Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores -
-#              Implementación de generación de AST y mejora de reglas de parsing.
+#              Implementación de generación de AST y mejora de reglas de parsing para anidación de Guards.
 
 import ply.yacc as Yacc
 import ply.lex as Lex
@@ -106,26 +106,60 @@ class AssignmentNode(Node):
 
 class IfNode(Node):
     """Representa una sentencia 'if' con múltiples guards."""
-    def __init__(self, guards):
-        self.guards = guards # Lista de GuardNode objects
+    # Ahora recibe una lista completa de GuardNode objetos
+    def __init__(self, guards_list):
+        self.guards_list = guards_list if guards_list is not None else []
 
     def __str__(self, level=0):
         ret = "-" * level + "If\n"
-        for guard in self.guards:
-            ret += guard.__str__(level + 1)
+        current_level = level + 1 # Este será el nivel para '--Guard'
+
+        num_total_guards = len(self.guards_list)
+        
+        # Imprimir la cadena de 'Guard's para establecer la anidación.
+        # Se imprimen N-1 'Guard's para un total de N guardias, como en la salida esperada (5 para 6 guardias).
+        num_guard_labels_to_print = num_total_guards - 1 
+
+        # Asegurarse de no intentar imprimir un número negativo de guardias si num_total_guards es 0 o 1
+        num_guard_labels_to_print = max(0, num_guard_labels_to_print)
+
+        for i in range(num_guard_labels_to_print):
+            ret += "-" * (current_level + i) + "Guard\n"
+
+        # Calcular el nivel de indentación para los bloques 'Then'.
+        # El nivel para el primer Then es: nivel del 'If' + numero_de_guardias_impresas + 1 (1 + 5 + 1 = 7)
+        # Los subsiguientes Then decrementan su nivel por 1.
+        
+        # Calcular el nivel inicial del primer 'Then' (que será el más profundo)
+        # Si 'level' es 0 para el "Block", entonces 'If' es 'level + 1' (1 guión).
+        # El primer Guard es 'level + 1' (2 guiones).
+        # El 'num_guard_labels_to_print' (5) representa los guiones *adicionales* a partir del '--Guard'.
+        # Entonces, el '-------Then' tiene (level + 1) + num_guard_labels_to_print + 1 = 0 + 1 + 5 + 1 = 7 guiones.
+        initial_then_level = level + num_guard_labels_to_print + 1 # This calculates 7 for the first 'Then'
+
+        # Imprimir cada bloque 'Then' con la indentación decreciente
+        for j, guard_node in enumerate(self.guards_list):
+            then_level = initial_then_level - j # Decrementa el nivel por cada 'Then' subsiguiente
+            
+            then_node = ThenNode(guard_node.condition, guard_node.instruction_list)
+            ret += then_node.__str__(then_level)
+            
         return ret
 
 class GuardNode(Node):
-    """Representa un guard dentro de un 'if' (condición --> instrucción), y puede enlazar al siguiente guard."""
+    """Representa un guard dentro de un 'if' (condición --> instrucción).
+       Este nodo ahora solo almacena la condición y las instrucciones;
+       su método __str__ solo imprime la etiqueta 'Guard'.
+       La impresión del 'Then' correspondiente se maneja centralmente en IfNode.
+    """
     def __init__(self, condition, instruction_list):
-        self.condition = condition # Nodo Expression
-        self.instruction_list = instruction_list # Nodo InstructionList
+        self.condition = condition 
+        self.instruction_list = instruction_list 
 
     def __str__(self, level=0):
-        ret = "-" * level + "Guard\n"
-        # Guard's condition and instruction list are now handled by ThenNode for consistency
-        ret += ThenNode(self.condition, self.instruction_list).__str__(level + 1)
-        return ret
+        # NOTA: En esta configuración, solo se imprime la etiqueta 'Guard'.
+        # El ThenNode asociado a este guard será impreso por IfNode.
+        return "-" * level + "Guard\n"
 
 class ThenNode(Node):
     """Representa la rama 'then' de un guard o while loop."""
@@ -182,7 +216,7 @@ class BinaryOpNode(Node):
             '>' : 'Greater',
             '>=': 'Geq',
             '==': 'Equal',
-            '<>': 'NotEqual',
+            '<>': 'NotEqual', # Corregido de NEqual para consistencia
             '+' : 'Plus',
             '-' : 'Minus',
             '*' : 'Mult',
@@ -547,9 +581,6 @@ def main():
         """
         p[0] = p[1]
 
-    # REMOVED: def p_declaration(p):
-    # This rule is no longer used as DeclarationGroup_primitive and DeclarationGroup_function are directly used.
-
     def p_function_declaration(p):
         """
         FunctionDeclaration : TkFunction TkOBracket TkSoForth Literal TkCBracket IdentList
@@ -611,26 +642,51 @@ def main():
 
     def p_if_statement(p):
         """
-        IfStatement : TkIf GuardList TkFi
+        IfStatement : TkIf FirstGuard OptGuards TkFi
         """
-        p[0] = IfNode(p[2]) # p[2] will be a list of GuardNode objects
+        # p[2] es el primer GuardNode (corresponde a la primera condición --> instrucciones)
+        # p[3] es la lista de GuardNode objetos para los guards subsiguientes (los '[]')
+        
+        all_guards = [p[2]] # Start with the first guard
+        if p[3]:
+            all_guards.extend(p[3]) # Add subsequent guards if they exist
+        
+        p[0] = IfNode(all_guards)
 
-    def p_guard_list(p):
+    def p_first_guard(p):
         """
-        GuardList : Guard
-                  | Guard TkGuard GuardList
+        FirstGuard : Expression TkArrow InstructionList
         """
-        if len(p) == 2: # Single Guard
-            p[0] = [p[1]]
-        else: # Guard TkGuard GuardList (multiple guards with [])
-            p[0] = [p[1]] + p[3]
+        p[0] = GuardNode(p[1], p[3])
+
+    # --- REGLAS PARA OptGuards y OptGuardsList ---
+    def p_opt_guards(p):
+        """
+        OptGuards : OptGuardsList
+                  | empty
+        """
+        # OptGuardsList retorna una lista, empty retorna None (que IfNode convertirá a [])
+        p[0] = p[1]
+
+    def p_opt_guards_list(p):
+        """
+        OptGuardsList : TkGuard Guard
+                      | TkGuard Guard OptGuardsList
+        """
+        if len(p) == 3: # TkGuard Guard
+            p[0] = [p[2]] # p[2] es un GuardNode
+        else: # TkGuard Guard OptGuardsList
+            p[0] = [p[2]] + p[3] # p[3] ya es una lista de la recursión
+    # --- FIN DE LAS REGLAS PARA OptGuards y OptGuardsList ---
 
     def p_guard(p):
         """
         Guard : Expression TkArrow InstructionList
         """
-        p[0] = GuardNode(p[1], p[3])
-
+        # Se sigue creando un GuardNode con su condición e instrucciones,
+        # pero su método __str__ NO las imprimirá directamente en este caso.
+        p[0] = GuardNode(p[1], p[3]) 
+    
     def p_while_loop(p):
         """
         WhileLoop : TkWhile Expression TkArrow InstructionList TkEnd
@@ -702,17 +758,9 @@ def main():
         else: # TkOpenPar Expression TkClosePar
             p[0] = p[2]
     
-    def p_app_expression(p): # Renombrar para ser más genérico
-        """
-        AppExpression : Primary TkApp Literal
-                      | Primary TkApp Ident
-        """
-        p[0] = AppNode(p[1], p[3])
-
     def p_app_expression_literal(p):
         """
         AppExpression : Ident TkApp Literal
-                      |
         """
         p[0] = AppNode(p[1], p[3])
 
