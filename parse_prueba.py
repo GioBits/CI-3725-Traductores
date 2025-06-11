@@ -70,7 +70,7 @@ def main():
         "TkNEqual" ,
         "TkOBracket" ,
         "TkCBracket" ,
-        "TkTowPoints" ,
+        "TkTwoPoints" ,
         "TkApp",
         "TkNum",
         "TkString",
@@ -104,7 +104,7 @@ def main():
     t_TkNEqual = r"\<\>"
     t_TkOBracket = r"\["
     t_TkCBracket = r"\]"
-    t_TkTowPoints = r"\:"
+    t_TkTwoPoints = r"\:"
     t_TkApp = r"\."
 
     # tokens especiales
@@ -190,13 +190,13 @@ def main():
     
     class Asig(Block): pass
     class If(Block): pass
-    class Gruar(Block): pass
+
     class While(Block): pass
     class Literal(Block): pass
     class Expr(Block): pass
 
 
-    class Binary_expressions(Expr):pass
+    class Binary_expressions(Block):pass
 
     # Se define la presedencia de los operadores
     # Desde menor presedencia a mayor y agrupación a izquierda
@@ -213,10 +213,6 @@ def main():
     start = "Block"
     # Se definen las reglas de la gramatica
     
-    def p_empty(p):
-        "empty :"
-        pass
-
     # permite recurción
     def p_Block(p):
         """
@@ -296,7 +292,8 @@ def main():
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma
         """
-        p[0] = ["WriteFunction", p[6]] + p[7] + [p[1], p[2], p[3], p[4], p[5]] 
+        p[0] = Declare(p[6] + p[7] + " : " + "function[.." + p[4].op + "]")
+        #p[0] = ["WriteFunction", p[6]] + p[7] + [p[1], p[2], p[3], p[4], p[5]] 
     def p_comma(p):
         """
         Comma : TkComma Ident
@@ -313,86 +310,144 @@ def main():
         Asig : Ident TkAsig expression
              | Ident TkAsig WriteFunction
         """
-        p[0] = [p[1], p[2], p[3]]
+        p[0] = Asig("Asig", p[1], p[3])
+        #p[0] = [p[1], p[2], p[3]]
     def p_writefunction(p):
         """
         WriteFunction : Ident acceso
         """
-        p[0] = [p[1], p[2]]
+        p[0] = WriteFunction("WriteFunction", p[1], p[2])
+        #p[0] = [p[1], p[2]]
+
+
+
+
+    #REvisarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+    class TwoPoints(Block): pass
     def p_acceso_funcion(p):
         """
         acceso : TkOpenPar expression TwoPoints expression TkClosePar
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5]]
+        p[0] = TwoPoints("TwoPoints", p[2], p[4])
+        #p[0] = [p[1], p[2], p[3], p[4], p[5]]
 
     def p_acceso_funcion_recursivo(p):
         """
         acceso : TkOpenPar expression TwoPoints expression TkClosePar acceso
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+        p[0] = TwoPoints("TwoPoints", p[2], p[4])
+        #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
 
     def p_if(p):
         """
-        If : TkIf expression Then Instruction Guard TkFi
+        If : TkIf Then Guard TkFi
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+        p[0] = IF("If", p[3], p[2])
+        #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+
+    class Then(Block): pass
+    def p_then(p):
+        """
+        Then : expression TkArrow Instruction
+        """
+        p[0] = Then("Then",p[1], p[3])
     def p_while(p):
         """
-        While : TkWhile expression Then Instruction TkEnd
+        While : TkWhile Then TkEnd
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5]]
+        p[0] = While("While", p[2])
+        #p[0] = [p[1], p[2], p[3], p[4], p[5]]
+
+    class Guard(Block): pass
+    def p_guard_recursivo(p):
+        """
+        Guard : TkGuard Then Guard
+        """
+        p[0] = Guard("Guard", p[3], p[2])
+        #p[0] = [p[1], p[2], p[3], p[4]]
     def p_guard(p):
         """
-        Guard : TkGuard expression Then Instruction
+        Guard : TkGuard Then
         """
-        p[0] = [p[1], p[2], p[3], p[4]]
-    def p_guard_empty(p):
-        """
-        Guard : empty
-        """
-        p[0] = p[1]
+        p[0] = Guard("Guard", None, p[2])
 
+
+
+
+
+    #----------------------------------------------
+    class Skip(Block): pass
     def p_skip(p):
         """
         Skip : TkSkip
         """
-        p[0] = p[1]
+        p[0] = Skip("Skip")
+        #p[0] = p[1]
+
+    class Print(Block): pass
 
     def p_print(p):
         """
         Print : TkPrint expression
         """
-        p[0] = [p[0], p[2]]
+        p[0] = Print("Print", p[2])
+        #p[0] = [p[0], p[2]]
 
     # estudiar la forma como se expresa esta gramática
     def p_binary_expressions(p):
         """
-        expression : expression Plus termino
-                   | expression Minus termino
-                   | expression Equal termino 
-                   | expression NEqual termino
-                   | expression Leq termino
-                   | expression Less termino
-                   | expression Geq termino
-                   | expression Greater termino
-                   | expression And termino
-                   | expression Or termino
+        expression : expression TkPlus termino
+                   | expression TkMinus termino
+                   | expression TkEqual termino 
+                   | expression TkNEqual termino
+                   | expression TkLeq termino
+                   | expression TkLess termino
+                   | expression TkGeq termino
+                   | expression TkGreater termino
+                   | expression TkAnd termino
+                   | expression TkOr termino
                    | expression TkApp termino
-        termino : termino Mult factor
+        termino : termino TkMult factor
         """
-        p[0] = [p[2], p[1], p[3]]
-        
+        if p[2] == "TkPlus":
+            p[0] = Binary_expressions("Plus", p[1], p[3])
+        elif p[2] == "TkMinus":
+            p[0] = Binary_expressions("Minus", p[1], p[3])
+        elif p[2] == "TkEqual":
+            p[0] = Binary_expressions("Equal", p[1], p[3])
+        elif p[2] == "TkNEqual":
+            p[0] = Binary_expressions("NEqual", p[1], p[3])
+        elif p[2] == "TkLeq":
+            p[0] = Binary_expressions("Leq", p[1], p[3])
+        elif p[2] == "TkLess":
+            p[0] = Binary_expressions("Less", p[1], p[3])
+        elif p[2] == "TkGeq":
+            p[0] = Binary_expressions("Geq", p[1], p[3])
+        elif p[2] == "TkGreater":
+            p[0] = Binary_expressions("TkGreater", p[1],p[3])
+        elif p[2] == "TkAnd":
+            p[0] = Binary_expressions("And", p[1], p[3])
+        elif p[2] == "TkApp":
+            p[0] = Binary_expressions("App", p[1], p[3])
+        elif p[2] == "TkMult":
+            p[0] = Binary_expressions("Mult", p[1], p[3])
+        elif p[0] == "TkOr":
+            p[0] = Binary_expressions("Or", p[1], p[3])
+
+        #p[0] = [p[2], p[1], p[3]]
+    class UExpresson(Block): pass
     def p_unary_expression(p):
         """
-        factor : Not factor
-                | Minus factor %prec UMinus
+        factor : TkNot factor
+                | TkMinus factor %prec UMinus
         """
+        p[0] = UExpresson(p[0]+p[1])
         p[0] = [p[1], p[2]]
     def p_factor(p):
         """
         factor : TkOpenPar expression TkClosePar
         """
-        p[0] = [p[1], p[2], p[3]]
+        p[0] = p[2]
 
 
 
@@ -403,24 +458,18 @@ def main():
         factor : Literal
                | Ident
                | String
-        And : TkAnd
-        Or : TkOr
-        Mult : TkMult
-        NEqual : TkNEqual
-        Equal : TkEqual
-        Leq : TkLeq
-        Less : TkLess
-        Geq : TkGeq
-        Greater : TkGreater
-        Plus : TkPlus
-        Minus : TkMinus
         Ident : TkId
-        String : TkString
-        TwoPoints : TkTowPoints
-        Then : TkArrow
-        Not : TkNot
+        TwoPoints : TkTwoPoints
         """
         p[0] = p[1]
+
+    class String(Block):pass
+
+    def p_string(p):
+        """
+        String : TkString
+        """
+        p[0] = String("String: "+p[1])
 
     # manejo de errores sintaticos
     class Literal(Block):pass
@@ -441,13 +490,14 @@ def main():
 
     prueba = """
                 {
-                    int d, b, s, c, g;
+                    function[..5] d, b, s, c, g;
                     b := 5
                 }
                 """
     result = parser.parse(prueba)
 
-    print(result.leftson.leftson.op)
+    #print(result.leftson.leftson.op)
+    imprimir_ast(result,0)
     
     #n = 0
     
@@ -463,9 +513,19 @@ def main():
     #imprimir_ast(result, 0)
     
 
+def imprimir_ast( arbol , n):
 
+    current = arbol
+    nivel = n
+
+    if current != None:
+        print("-"*nivel+f"{current.op}")
+        if current.leftson != None:
+            imprimir_ast( current.leftson, nivel+1)
+        if current.rightson != None:
+            imprimir_ast( current.rightson, nivel+1)
     
-def imprimir_ast(arbol, n):
+def imprimir_ast2(arbol, n):
 
     current = arbol
     space = n
