@@ -266,8 +266,8 @@ def main():
 
     def p_declare_int_bool(p):
         """
-        Declare : TkBool Ident
-                | TkInt Ident
+        Declare : TkBool TkId
+                | TkInt TkId
         """
         p[0] = Declare(p[2] + " : " + p[1])
         #p[0] = [p[2], p[1]]
@@ -275,34 +275,34 @@ def main():
 
     def p_declare_function(p):
         """
-        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident
+        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId
         """
         p[0] = Declare(p[6] + " : " + "function[.." + p[4].op + "]")
         #p[0] = ["function", p[6], p[1], p[2], p[3], p[4], p[5]]
     # permite recursión
     def p_declare_int_bool_with_comma(p):
         """
-        Declare : TkBool Ident Comma
-                | TkInt Ident Comma
+        Declare : TkBool TkId Comma
+                | TkInt TkId Comma
         """
         p[0] = Declare(p[2] + p[3] + " : " + p[1])
         #p[0] = [p[1], p[2]] + p[3]
     # permite recursión
     def p_declare_function_with_comma(p):
         """
-        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma
+        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId Comma
         """
         p[0] = Declare(p[6] + p[7] + " : " + "function[.." + p[4].op + "]")
         #p[0] = ["WriteFunction", p[6]] + p[7] + [p[1], p[2], p[3], p[4], p[5]] 
     def p_comma(p):
         """
-        Comma : TkComma Ident
+        Comma : TkComma TkId
         """
         p[0] = " " + p[1] + " " + p[2]
     # permite recursión
     def p_comma_with_comma(p):
         """
-        Comma : TkComma Ident Comma
+        Comma : TkComma TkId Comma
         """
         p[0] = " " + p[1] + " " + p[2] + " " + p[3]
     def p_asig(p):
@@ -456,15 +456,20 @@ def main():
         expression : termino
         termino : factor
         factor : Literal
-               | Ident
+               | TkId
                | String
-        Ident : TkId
         TwoPoints : TkTwoPoints
         """
         p[0] = p[1]
 
     class String(Block):pass
 
+    class Ident(Block): pass
+    def p_ident(p):
+        """
+        Ident : TkId
+        """
+        p[0] = Ident("Ident: " + p[1])
     def p_string(p):
         """
         String : TkString
@@ -490,8 +495,8 @@ def main():
 
     prueba = """
                 {
-                    function[..5] d, b, s, c, g;
-                    b := 5
+                    int a;
+                    a := 10+2
                 }
                 """
     result = parser.parse(prueba)
