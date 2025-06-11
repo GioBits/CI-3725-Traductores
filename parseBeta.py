@@ -1,5 +1,5 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
-# Date: 10 de junio de 2025 (Actualizado)
+# Date: June 11, 2025 (Updated)
 # Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores -
 #              Implementación de generación de AST y mejora de reglas de parsing.
 
@@ -30,23 +30,19 @@ class BlockNode(Node):
         if self.declarations:
             ret += self.declarations.__str__(current_level)
         
-        # Manejar instrucciones: si es un SequencingNode con un solo item, imprimir el item directamente
-        # Esto evita un encabezado "Sequencing" extra cuando hay solo una instrucción (como un IfStatement)
         if self.instructions:
-            if isinstance(self.instructions, SequencingNode) and len(self.instructions.statements) == 1:
-                ret += self.instructions.statements[0].__str__(current_level)
-            else:
-                ret += self.instructions.__str__(current_level)
+            # Aquí ya no asumimos que self.instructions es necesariamente un SequencingNode
+            ret += self.instructions.__str__(current_level)
         return ret
 
 class DeclarationsSectionNode(Node):
     """Representa toda la sección de declaraciones, conteniendo una secuencia de declaraciones."""
-    def __init__(self, sequencing_node):
-        self.sequencing_node = sequencing_node
+    def __init__(self, content_node): # Renombramos a content_node
+        self.content_node = content_node
 
     def __str__(self, level=0):
         ret = "-" * level + "Declare\n"
-        ret += self.sequencing_node.__str__(level + 1)
+        ret += self.content_node.__str__(level + 1) # Imprime el nodo contenido (SequencingNode o DeclareNode)
         return ret
 
 class SequencingNode(Node):
@@ -110,49 +106,48 @@ class AssignmentNode(Node):
 
 class IfNode(Node):
     """Representa una sentencia 'if' con múltiples guards."""
-    def __init__(self, guard_chain):
-        self.guard_chain = guard_chain # El nodo Guard raíz de la cadena anidada
+    def __init__(self, guards):
+        self.guards = guards # Lista de GuardNode objects
 
     def __str__(self, level=0):
         ret = "-" * level + "If\n"
-        if self.guard_chain:
-            ret += self.guard_chain.__str__(level + 1) # Imprime la estructura de guards anidados
+        for guard in self.guards:
+            ret += guard.__str__(level + 1)
         return ret
 
 class GuardNode(Node):
     """Representa un guard dentro de un 'if' (condición --> instrucción), y puede enlazar al siguiente guard."""
-    def __init__(self, condition, instruction_list, next_guard=None):
+    def __init__(self, condition, instruction_list):
         self.condition = condition # Nodo Expression
         self.instruction_list = instruction_list # Nodo InstructionList
-        self.next_guard = next_guard # Opcional: enlace al siguiente GuardNode en la cadena
 
-    def __str__(self, current_level=0):
-        ret = "-" * current_level + "Guard\n"
-        if self.next_guard:
-            ret += self.next_guard.__str__(current_level + 1) # Imprime recursivamente el siguiente guard a mayor nivel
-        ret += self.condition.__str__(current_level + 1)
-        ret += ThenNode(self.instruction_list).__str__(current_level + 1)
+    def __str__(self, level=0):
+        ret = "-" * level + "Guard\n"
+        # Guard's condition and instruction list are now handled by ThenNode for consistency
+        ret += ThenNode(self.condition, self.instruction_list).__str__(level + 1)
         return ret
 
 class ThenNode(Node):
     """Representa la rama 'then' de un guard o while loop."""
-    def __init__(self, instruction):
-        self.instruction = instruction
+    def __init__(self, condition_expr, instruction_list):
+        self.condition_expr = condition_expr
+        self.instruction_list = instruction_list
     def __str__(self, level=0):
         ret = "-" * level + "Then\n"
-        ret += self.instruction.__str__(level + 1)
+        ret += self.condition_expr.__str__(level + 1) # Imprime la condición
+        ret += self.instruction_list.__str__(level + 1) # Imprime la lista de instrucciones
         return ret
 
 class WhileNode(Node):
     """Representa un loop 'while'."""
     def __init__(self, condition, body):
         self.condition = condition # Nodo Expression
-        self.body = body         # Nodo Instruction
+        self.body = body         # Nodo InstructionList
 
     def __str__(self, level=0):
         ret = "-" * level + "While\n"
-        ret += self.condition.__str__(level + 1)
-        ret += ThenNode(self.body).__str__(level + 1) # While también tiene estructura 'Then'
+        # While loop's condition and body are now handled by ThenNode for consistency
+        ret += ThenNode(self.condition, self.body).__str__(level + 1)
         return ret
 
 class PrintNode(Node):
@@ -167,6 +162,8 @@ class PrintNode(Node):
 
 class SkipNode(Node):
     """Representa una sentencia 'skip'."""
+    def __init__(self):
+        pass # No need for any attributes
     def __str__(self, level=0):
         return "-" * level + "Skip\n"
 
@@ -185,15 +182,15 @@ class BinaryOpNode(Node):
             '>' : 'Greater',
             '>=': 'Geq',
             '==': 'Equal',
-            '<>': 'NEqual',
+            '<>': 'NotEqual',
             '+' : 'Plus',
             '-' : 'Minus',
             '*' : 'Mult',
             'and': 'And', 
             'or': 'Or',
-            '!': 'Not' # Añadido para completitud, aunque usualmente es unario
+            '!': 'Not' 
         }
-        display_op = op_map.get(self.op, self.op).capitalize() # Usa el operador original si no está en el mapa
+        display_op = op_map.get(self.op, self.op) # Usa el operador original si no está en el mapa
         ret = "-" * level + display_op + "\n"
         ret += self.left.__str__(level + 1)
         ret += self.right.__str__(level + 1)
@@ -222,7 +219,7 @@ class LiteralNode(Node):
 
     def __str__(self, level=0):
         if isinstance(self.value, bool):
-            return "-" * level + f"Literal: {str(self.value).capitalize()}\n"
+            return "-" * level + f"Literal: {str(self.value).lower()}\n" # Asegura minúsculas para booleanos
         return "-" * level + f"Literal: {self.value}\n"
 
 class StringNode(Node):
@@ -448,7 +445,6 @@ def main():
         """
         Block : TkOBlock InnerBlock TkCBlock
         """
-        # p[2] es una tupla (declarations_node, instructions_node) de InnerBlock
         p[0] = BlockNode(declarations=p[2][0], instructions=p[2][1])
 
     def p_InnerBlock(p):
@@ -458,50 +454,87 @@ def main():
                    | InstructionList
                    | empty
         """
+        declarations_node = None
+        instructions_node = None
+
         if len(p) == 3: # DeclareSection InstructionList
-            declarations_node = DeclarationsSectionNode(p[1])
-            instructions_node = p[2]
+            # p[1] es una lista de nodos de declaración (del p_DeclareSection modificado)
+            if p[1]: # Si hay declaraciones
+                if len(p[1]) == 1 and isinstance(p[1][0], DeclareNode):
+                    # Si solo hay una declaración de tipo primitivo, el DeclarationsSectionNode
+                    # contendrá directamente ese DeclareNode.
+                    declarations_node = DeclarationsSectionNode(p[1][0])
+                else:
+                    # Si hay múltiples declaraciones o funciones, se agrupan en SequencingNode
+                    declarations_node = DeclarationsSectionNode(SequencingNode(p[1]))
+            instructions_node = p[2] # Este ya será un SequencingNode o el nodo Instruction
             p[0] = (declarations_node, instructions_node)
+
         elif len(p) == 2:
-            if isinstance(p[1], SequencingNode) and p[1].statements and \
-               isinstance(p[1].statements[0], (DeclareNode, FunctionDeclareNode)):
-                declarations_node = DeclarationsSectionNode(p[1])
+            if isinstance(p[1], list): # Es un DeclareSection (p[1] es una lista de nodos)
+                if p[1]: # Si hay declaraciones
+                    if len(p[1]) == 1 and isinstance(p[1][0], DeclareNode):
+                        declarations_node = DeclarationsSectionNode(p[1][0])
+                    else:
+                        declarations_node = DeclarationsSectionNode(SequencingNode(p[1]))
                 p[0] = (declarations_node, None)
             else: # Debe ser un InstructionList
                 p[0] = (None, p[1])
         else: # empty
             p[0] = (None, None)
 
+    def p_DeclarationGroup_primitive(p):
+        """
+        DeclarationGroup : Type IdentList
+        """
+        p[0] = DeclareNode(p[2], p[1])
+
+    def p_DeclarationGroup_function(p):
+        """
+        DeclarationGroup : FunctionDeclaration
+        """
+        p[0] = p[1] # p[1] es ya un SequencingNode de FunctionDeclareNode
 
     def p_DeclareSection(p):
         """
-        DeclareSection : Declaration TkSemicolon
-                       | Declaration TkSemicolon DeclareSection
+        DeclareSection : DeclarationGroup TkSemicolon
+                       | DeclarationGroup TkSemicolon DeclareSection
         """
-        if len(p) == 3: # Declaration TkSemicolon
+        if len(p) == 3: # Caso base: un solo grupo de declaración
+            # Siempre retorna una lista, incluso si es de un solo elemento
+            # Si p[1] es un SequencingNode (para funciones), aplanamos sus statements
             if isinstance(p[1], SequencingNode):
-                p[0] = p[1]
-            else:
-                p[0] = SequencingNode([p[1]])
-        else: # Declaration TkSemicolon DeclareSection (caso recursivo)
-            if isinstance(p[1], SequencingNode):
-                p[3].statements.extend(p[1].statements)
-                p[0] = p[3]
-            else:
-                p[3].statements.insert(0, p[1])
-                p[0] = p[3]
+                p[0] = p[1].statements
+            else: # Es un DeclareNode (variable primitiva)
+                p[0] = [p[1]]
+        else: # Caso recursivo: múltiples grupos de declaración
+            current_group_list = []
+            if isinstance(p[1], SequencingNode): # Si es una función, aplanamos
+                current_group_list = p[1].statements
+            else: # Es una variable primitiva
+                current_group_list = [p[1]]
 
-
+            p[0] = current_group_list + p[3] # p[3] ya será una lista de la recursión
+    
     def p_InstructionList(p):
         """
         InstructionList : Instruction
                         | Instruction TkSemicolon InstructionList
         """
         if len(p) == 2: # Instrucción única
-            p[0] = SequencingNode([p[1]])
-        else: # Instruction TkSemicolon InstructionList (caso recursivo)
-            p[3].statements.insert(0, p[1])
-            p[0] = p[3]
+            # Directamente el nodo de instrucción, sin SequencingNode si es uno solo
+            p[0] = p[1]
+        else: # Caso recursivo: múltiples instrucciones
+            current_instruction = p[1]
+            rest_of_list = p[3] # Esto puede ser un nodo de instrucción o un SequencingNode
+
+            if isinstance(rest_of_list, SequencingNode):
+                # Si el resto de la lista ya es un SequencingNode, añadimos la instrucción actual al principio
+                p[0] = SequencingNode([current_instruction] + rest_of_list.statements)
+            else:
+                # Si el resto de la lista es una única instrucción, creamos un nuevo SequencingNode
+                # que contenga la instrucción actual y la siguiente.
+                p[0] = SequencingNode([current_instruction, rest_of_list])
 
     def p_instruction(p):
         """
@@ -514,17 +547,8 @@ def main():
         """
         p[0] = p[1]
 
-    def p_declaration(p):
-        """
-        Declaration : Type IdentList
-                    | FunctionDeclaration
-        """
-        if len(p) == 3: # Type IdentList (ej: int a, b)
-            ident_nodes = p[2]
-            type_node = p[1]
-            p[0] = DeclareNode(ident_nodes, type_node)
-        else: # FunctionDeclaration
-            p[0] = p[1]
+    # REMOVED: def p_declaration(p):
+    # This rule is no longer used as DeclarationGroup_primitive and DeclarationGroup_function are directly used.
 
     def p_function_declaration(p):
         """
@@ -587,22 +611,19 @@ def main():
 
     def p_if_statement(p):
         """
-        IfStatement : TkIf Guards TkFi
+        IfStatement : TkIf GuardList TkFi
         """
-        p[0] = IfNode(p[2])
+        p[0] = IfNode(p[2]) # p[2] will be a list of GuardNode objects
 
-    def p_guards_recursive(p):
+    def p_guard_list(p):
         """
-        Guards : Guard TkGuard Guards
+        GuardList : Guard
+                  | Guard TkGuard GuardList
         """
-        p[1].next_guard = p[3]
-        p[0] = p[1]
-
-    def p_guards_single(p):
-        """
-        Guards : Guard
-        """
-        p[0] = p[1]
+        if len(p) == 2: # Single Guard
+            p[0] = [p[1]]
+        else: # Guard TkGuard GuardList (multiple guards with [])
+            p[0] = [p[1]] + p[3]
 
     def p_guard(p):
         """
