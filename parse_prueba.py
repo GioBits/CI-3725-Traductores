@@ -257,9 +257,9 @@ def main():
 
     def p_sequencing_declare_recursivo(p):
         """
-        SequencingDeclare : Declare TkSemicolon SequencingDeclare
+        SequencingDeclare : SequencingDeclare Declare TkSemicolon
         """
-        p[0] = SequencingDeclare("Sequencing", p[1], p[3])
+        p[0] = SequencingDeclare("Sequencing", p[1], p[2])
 
 
     def p_sequencing_declare(p):
@@ -310,78 +310,46 @@ def main():
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
-             | Ident TkAsig WriteFunction
         """
         p[0] = Asig("Asig", p[1], p[3])
-
-    def p_writefunction(p):
-        """
-        WriteFunction : Ident acceso
-        """
-        p[0] = WriteFunction("WriteFunction", p[1], p[2])
-
-
 
 
     #REvisarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 
-    def p_acceso_funcion(p):
-        """
-        acceso : TkOpenPar expression TwoPoints expression TkClosePar
-        """
-        p[0] = TwoPoints("TwoPoints", p[2], p[4])
-        #p[0] = [p[1], p[2], p[3], p[4], p[5]]
 
-    def p_acceso_funcion_recursivo(p):
-        """
-        acceso : TkOpenPar TwoPoints TkClosePar acceso
-        """
-        p[0] = TwoPoints("TwoPoints", p[2], p[4])
-        #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
 
-    def p_twopoints(p):
-        """
-        TwoPoints : expression TkTwoPoints expression
-        """
     def p_if(p):
         """
-        If : TkIf Then TkFi
+        If : TkIf Guard TkFi
         """
         p[0] = If("If", p[2])
-        #p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
-    def p_if_guard(p):
-        """
-        If : TkIf Then Guard TkFi
-        """
-        p[0] = If("If", p[3], p[2])
+
     
-    def p_then(p):
+    def p_guard0(p):
         """
-        Then : expression TkArrow Sequencing
+        Guard : Guard TkGuard Then
         """
-        p[0] = Then("Then",p[1], p[3])
+        p[0] = Guard("Guard", p[1], p[3])
+
+
+    def p_guard1(p):
+        """
+        Guard : Then
+        """
+        p[0] = p[1]
+
     def p_while(p):
         """
         While : TkWhile Then TkEnd
         """
         p[0] = While("While", p[2])
-        #p[0] = [p[1], p[2], p[3], p[4], p[5]]
-
-    
-    def p_guard_recursivo(p):
-        """
-        Guard : TkGuard Then Guard
-        """
-        p[0] = Guard("Guard", p[3], p[2])
-        #p[0] = [p[1], p[2], p[3], p[4]]
-    def p_guard(p):
-        """
-        Guard : TkGuard Then
-        """
-        p[0] = Guard("Guard", None, p[2])
 
 
-
+    def p_then(p):
+        """
+        Then : expression TkArrow Sequencing
+        """
+        p[0] = Then("Then",p[1], p[3])
 
 
     #----------------------------------------------
@@ -477,6 +445,7 @@ def main():
     
 
     
+    
     def p_ident(p):
         """
         Ident : TkId
@@ -516,7 +485,9 @@ def main():
     prueba = """
                 {
                     int a;
-                    a := A.2+-B.1*A(2:3).2
+                    if a -->
+                        print "lee"
+                    fi
                 }
                 """
     result = parser.parse(input_data)
