@@ -212,8 +212,8 @@ def main():
         ("left", "TkTwoPoints"),
         ("left", "TkPlus", "TkMinus"),
         ("left", "TkMult"),
-        ("left", "TkApp"),
-        ("right", "UMinus", "TkNot")  # menos unario
+        ("right", "UMinus", "TkNot"), # menos unario
+        ("left", "TkApp")  
     )
 
     # Se define símbolo inicial
@@ -226,11 +226,7 @@ def main():
         Block : TkOBlock DeclareSection Sequencing TkCBlock
         """
         p[0] = Block("Block", p[2], p[3])
-    def p_block_only1(p):
-        """
-        Block : TkOBlock Instruction TkCBlock
-        """
-        p[0] = Block("Block", p[2])
+
     def p_block_only_sequencing(p):
         """
         Block : TkOBlock Sequencing TkCBlock
@@ -396,9 +392,8 @@ def main():
                   | termino12 TkTwoPoints termino2
         termino2 : termino2 TkPlus termino3
                  | termino2 TkMinus termino3 
-        termino3 : termino3 TkMult termino4
-        termino4 : termino4 TkApp factor
-
+        termino3 : termino3 TkMult factor
+        factor : factor TkApp factor
         """
         if p[2] == "+":
             p[0] = Binary_expressions("Plus", p[1], p[3])
@@ -433,7 +428,7 @@ def main():
     def p_unary_expression(p):
         """
         factor : TkNot factor
-                | TkMinus factor %prec UMinus
+               | TkMinus factor %prec UMinus
         """
         if p[1] == "!":
             p[0] = UExpresson("Not", p[2])
