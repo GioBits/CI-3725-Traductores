@@ -366,7 +366,7 @@ def main():
         """
         Skip : TkSkip
         """
-        p[0] = Skip("Skip")
+        p[0] = Skip("skip")
         #p[0] = p[1]
 
     
