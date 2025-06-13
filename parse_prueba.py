@@ -206,7 +206,10 @@ def main():
     precedence = (
         ("left", "TkOr"),
         ("left", "TkAnd"),
-        ("left", "TkNEqual", "TkEqual", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
+        ("left", "TkNEqual", "TkEqual"),
+        ("left", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
+        ("left", "TkComma"),
+        ("left", "TkTwoPoints"),
         ("left", "TkPlus", "TkMinus"),
         ("left", "TkMult"),
         ("left", "TkApp"),
@@ -223,7 +226,16 @@ def main():
         Block : TkOBlock DeclareSection Sequencing TkCBlock
         """
         p[0] = Block("Block", p[2], p[3])
-
+    def p_block_only1(p):
+        """
+        Block : TkOBlock Instruction TkCBlock
+        """
+        p[0] = Block("Block", p[2])
+    def p_block_only_sequencing(p):
+        """
+        Block : TkOBlock Sequencing TkCBlock
+        """
+        p[0] = Block("Block", p[2])
     def p_sequencing(p):
         """
         Sequencing : Sequencing TkSemicolon Instruction
@@ -374,12 +386,14 @@ def main():
         """
         expression : expression TkOr termino0
         termino0 : termino0 TkAnd termino1
-        termino1 : termino1 TkEqual termino2
-                 | termino1 TkNEqual termino2
-                 | termino1 TkLeq termino2
-                 | termino1 TkLess termino2
-                 | termino1 TkGeq termino2
-                 | termino1 TkGreater termino2
+        termino1 : termino1 TkEqual termino12
+                 | termino1 TkNEqual termino12
+                 | termino1 TkLeq termino12
+                 | termino1 TkLess termino12
+                 | termino1 TkGeq termino12
+                 | termino1 TkGreater termino12
+        termino12 : termino12 TkComma termino2
+                  | termino12 TkTwoPoints termino2
         termino2 : termino2 TkPlus termino3
                  | termino2 TkMinus termino3 
         termino3 : termino3 TkMult termino4
@@ -410,6 +424,10 @@ def main():
             p[0] = Binary_expressions("Geq", p[1], p[3])
         elif p[2] == ">":
             p[0] = Binary_expressions("Greater", p[1],p[3])
+        elif p[2] == ",":
+            p[0] = Binary_expressions("Comma", p[1], p[3])
+        elif p[2] == ":":
+            p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
     
     def p_unary_expression(p):
@@ -426,19 +444,24 @@ def main():
         factor : TkOpenPar expression TkClosePar
         """
         p[0] = p[2]
+    def p_factor_writefunction(p):
+        """
+        factor : factor TkOpenPar expression TkClosePar
+        """
+        p[0] = Binary_expressions("WriteFunction", p[1], p[3])
 
     def p_subtitutions(p):
         """
         expression : termino0
         termino0 : termino1
-        termino1 : termino2
+        termino1 : termino12
+        termino12 : termino2
         termino2 : termino3
         termino3 : termino4
         termino4 : factor
         factor : Literal
                | Ident
                | String
-        TwoPoints : TkTwoPoints
         """
         p[0] = p[1]
 
@@ -455,7 +478,7 @@ def main():
         """
         String : TkString
         """
-        p[0] = String("String: "+p[1])
+        p[0] = String("String: "+f"\"{p[1]}\"")
 
     # manejo de errores sintaticos
     
@@ -485,9 +508,7 @@ def main():
     prueba = """
                 {
                     int a;
-                    if a -->
-                        print "lee"
-                    fi
+                    a := a(5:t).a
                 }
                 """
     result = parser.parse(input_data)
