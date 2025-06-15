@@ -1,36 +1,53 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
-# Date: 
-# Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores 
+# Date: 14 de junio de 2025 (Actualizado)
+# Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores -
+#              Implementación de un analizador léxico y sintáctico para un lenguaje imperativo,
+#              con construcción de un Árbol de Sintaxis Abstracta (AST).
 
-import ply.yacc as Yacc
-import ply.lex as Lex
-import sys
+import ply.yacc as Yacc  # Importa el módulo Yacc de PLY para el analizador sintáctico
+import ply.lex as Lex    # Importa el módulo Lex de PLY para el analizador léxico
+import sys               # Importa el módulo sys para acceder a argumentos de línea de comandos y salir del programa
 
 
 def main():
-    # Verificar que se proporcionó un archivo como argumento
+    """
+    Función principal del programa.
+    Gestiona la entrada de archivos, el proceso de análisis léxico y sintáctico,
+    y la impresión del Árbol de Sintaxis Abstracta (AST) resultante.
+    """
+    # --------------------------------------------------------------------------
+    # Gestión de la entrada de archivos
+    # --------------------------------------------------------------------------
+    # Verifica que se haya proporcionado exactamente un argumento de línea de comandos (el nombre del archivo).
     if len(sys.argv) != 2:
         print("Error: Por favor proporcione un archivo .imperat como argumento")
         print("Uso: python lexer.py archivo.imperat")
-        sys.exit(1)
+        sys.exit(1) # Sale del programa con un código de error
 
-    # Verificar que el archivo tenga la extensión correcta
+    # Verifica que el archivo proporcionado tenga la extensión '.imperat'.
     if not sys.argv[1].endswith('.imperat'):
         print("Error: El archivo debe tener extensión .imperat")
-        sys.exit(1)
+        sys.exit(1) # Sale del programa con un código de error
 
-    # Intentar abrir y leer el archivo
+    # Intenta abrir y leer el contenido del archivo de entrada.
     try:
         with open(sys.argv[1], 'r') as file:
             input_data = file.read()
     except FileNotFoundError:
+        # Captura el error si el archivo no se encuentra
         print(f"Error: No se encontró el archivo {sys.argv[1]}")
         sys.exit(1)
     except Exception as e:
+        # Captura cualquier otro error durante la lectura del archivo
         print(f"Error al leer el archivo: {str(e)}")
         sys.exit(1)
 
-    # palabras reservadas del lenguaje
+    # --------------------------------------------------------------------------
+    # Definición del Analizador Léxico (Lexer)
+    # --------------------------------------------------------------------------
+
+    # Palabras reservadas del lenguaje.
+    # Un diccionario que mapea las palabras clave (strings) a sus nombres de token.
     reserved = {
         "if" : "TkIf",
         "fi" : "TkFi",
@@ -47,44 +64,44 @@ def main():
         "and" : "TkAnd"
     }
 
+    # Lista de todos los nombres de tokens reconocidos por el lexer.
+    # Incluye tokens para operadores, delimitadores, tipos de datos, identificadores,
+    # literales y las palabras reservadas.
     tokens = [
-        "TkOBlock" ,
-        "TkCBlock" ,
-        "TkSoForth" ,
-        "TkComma" ,
-        "TkOpenPar" ,
-        "TkClosePar" ,
-        "TkAsig" ,
-        "TkSemicolon" ,
-        "TkArrow" ,
-        "TkGuard" ,
-        "TkPlus" ,
-        "TkMinus" ,
-        "TkMult" ,
-        "TkNot" ,
-        "TkLess" ,
-        "TkLeq" ,
-        "TkGeq" ,
-        "TkGreater" ,
-        "TkEqual" ,
-        "TkNEqual" ,
-        "TkOBracket" ,
-        "TkCBracket" ,
-        "TkTwoPoints" ,
-        "TkApp",
-        "TkNum",
-        "TkString",
-        "TkId"
+        "TkOBlock" ,    # {
+        "TkCBlock" ,    # }
+        "TkSoForth" ,   # .. (operador "hasta" para funciones)
+        "TkComma" ,     # ,
+        "TkOpenPar" ,   # (
+        "TkClosePar" ,  # )
+        "TkAsig" ,      # := (operador de asignación)
+        "TkSemicolon" , # ;
+        "TkArrow" ,     # --> (separador en guardias y bucles while)
+        "TkGuard" ,     # [] (operador de guardia anidada)
+        "TkPlus" ,      # +
+        "TkMinus" ,     # -
+        "TkMult" ,      # *
+        "TkNot" ,       # ! (negación lógica)
+        "TkLess" ,      # <
+        "TkLeq" ,       # <=
+        "TkGeq" ,       # >=
+        "TkGreater" ,   # >
+        "TkEqual" ,     # ==
+        "TkNEqual" ,    # <> (no igual)
+        "TkOBracket" ,  # [
+        "TkCBracket" ,  # ]
+        "TkTwoPoints" , # : (dos puntos para acceso a funciones)
+        "TkApp",        # . (operador de aplicación o acceso a miembros)
+        "TkNum",        # Números enteros
+        "TkString",     # Cadenas de texto
+        "TkId"          # Identificadores (nombres de variables, funciones)
+    ] + list(reserved.values()) # Añade los valores de las palabras reservadas a la lista de tokens
 
-    ] + list(reserved.values())
-
-
-
-    # tokens sencillos
-
+    # Definiciones de expresiones regulares para tokens simples.
+    # Cada 't_' prefijo indica una regla de token. PLY usa estas para el reconocimiento léxico.
     t_TkOBlock = r"\{"
     t_TkCBlock = r"\}"
-    t_TkSoForth = r"\. \."   
+    t_TkSoForth = r"\. \."   # Expresión regular para '..'
     t_TkComma = r"\,"       
     t_TkOpenPar = r"\("
     t_TkClosePar = r"\)"
@@ -107,38 +124,48 @@ def main():
     t_TkTwoPoints = r"\:"
     t_TkApp = r"\."
 
-    # tokens especiales
+    # Tokens con reglas de expresiones regulares más complejas o lógica adicional.
+    # Estas funciones permiten realizar acciones cuando se reconoce un token.
 
     def t_COMMENT(t):
         r'//.*'
-        pass  # No retorna nada - ignora los comentarios
+        # Ignora las líneas que comienzan con '//' (comentarios de una sola línea).
+        pass  # No retorna valor, por lo tanto, el lexer ignora este token.
         
     def t_TkId(t):
         r"[a-zA-Z_][a-zA-Z_0-9]*"
+        # Reconoce identificadores que comienzan con una letra o guion bajo, seguidos de letras, números o guiones bajos.
+        # Verifica si el identificador es una palabra reservada. Si lo es, su tipo de token cambia al de la palabra reservada.
         t.type = reserved.get(t.value, "TkId")
         return t
 
     def t_TkString(t):
         r'"[^"\\\n]*(?:\\[n"\\][^"\\\n]*)*"'
-        t.value = t.value[1:-1]  # Remover las comillas
+        # Reconoce cadenas de texto encerradas entre comillas dobles, permitiendo caracteres escapados como \n, \", \\.
+        t.value = t.value[1:-1]  # Elimina las comillas del principio y final del valor del token.
         return t
 
     def t_TkNum(t):
         r"\d+"
-        t.value = int(t.value)
+        # Reconoce secuencias de uno o más dígitos como números enteros.
+        t.value = int(t.value)   # Convierte la cadena de dígitos a un valor entero.
         return t
 
-    # manejo de errores 
-    errors = []  # Lista para almacenar errores
+    # Manejo de errores léxicos.
+    # Lista para almacenar los errores léxicos encontrados.
+    errors = []  
 
     def t_error(t):
+        # Función que se llama cuando el lexer encuentra un carácter inesperado.
+        # Calcula la columna del error para un mensaje más informativo.
         column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
-        if column <= 0:
+        if column <= 0: # Ajustar para casos donde el token está al inicio de la línea
             column = t.lexpos + 1
-        errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
-        t.lexer.skip(1)
+        errors.append(f"Error: Carácter inesperado \"{t.value[0]}\" en fila {t.lineno}, columna {column}")
+        t.lexer.skip(1) # Avanza el lexer un carácter para intentar recuperarse.
 
-    # Actualizar la posición de la columna
+    # Actualizar la posición de la columna.
+    # Esta función auxiliar calcula la columna de un token en una línea determinada.
     def find_column(input, token):
         last_cr = input.rfind('\n', 0, token.lexpos)
         if last_cr < 0:
@@ -146,104 +173,148 @@ def main():
         column = (token.lexpos - last_cr)
         return column
 
-    # tokens ignorados
-
+    # Tokens ignorados por el lexer (espacios en blanco y tabulaciones).
     t_ignore = " \t"
 
-    # conteo de lineas 
-    
+    # Conteo de líneas.
+    # Actualiza el número de línea del lexer cada vez que encuentra uno o más saltos de línea.
     def t_newline( t ):
         r"\n+"
         t.lexer.lineno += len(t.value)
 
-
-    # llamada al contructor lexico
-
+    # Construir el analizador léxico (lexer).
+    # Se inicializa el lexer de PLY con las reglas definidas.
     lexer = Lex.lex()
 
-    # entrada de la data para los tokens
-
+    # Alimentar el lexer con los datos de entrada para generar los tokens.
     lexer.input(input_data)
 
-    #------------------------------------------------
-    # Etapa2
-    #------------------------------------------------
+    # --------------------------------------------------------------------------
+    # Definición del Analizador Sintáctico (Parser) y la Construcción del AST
+    # --------------------------------------------------------------------------
 
-
+    # Clases de Nodos del Árbol de Sintaxis Abstracta (AST).
+    # Cada clase representa un tipo de construcción sintáctica del lenguaje.
+    # Los nodos almacenan el operador de la construcción y sus hijos (sub-árboles).
 
     class Block():
+        """Representa un bloque de código."""
         def __init__(self,op = None, leftson = None, rightson = None):
-            self.op = op
-            self.leftson = leftson
-            self.rightson = rightson
+            self.op = op          # Operador o tipo de nodo (ej: "Block")
+            self.leftson = leftson  # Hijo izquierdo del nodo
+            self.rightson = rightson # Hijo derecho del nodo
+
+    class DeclareSection(Block): 
+        """Representa la sección de declaraciones dentro de un bloque."""
+        pass
+    class Sequencing(Block):
+        """Representa una secuencia de instrucciones o declaraciones."""
+        pass
+    class SequencingDeclare(Block): 
+        """Representa una secuencia de declaraciones específicas."""
+        pass
+    class Declare(Block): 
+        """Representa una declaración individual (variable o función)."""
+        pass
+    class WriteFunction(Block): 
+        """Representa la escritura de valores a parámetros de una función."""
+        pass
+    class Asig(Block): 
+        """Representa una instrucción de asignación."""
+        pass
+    class If(Block): 
+        """Representa una sentencia condicional 'if' con guardias."""
+        pass
+    class While(Block): 
+        """Representa una sentencia de bucle 'while'."""
+        pass
+    class Literal(Block): 
+        """Representa un valor literal (número, true, false)."""
+        pass
+    class Expr(Block): 
+        """Clase base para expresiones."""
+        pass
+    class Binary_expressions(Block):
+        """Representa una operación binaria (ej: suma, resta, AND, OR)."""
+        pass
+    class Ident(Block): 
+        """Representa un identificador (nombre de variable o función)."""
+        pass
+    class String(Block):
+        """Representa un literal de cadena de texto."""
+        pass
+    class UExpresson(Block): 
+        """Representa una operación unaria (ej: negación, menos unario)."""
+        pass
+    class Print(Block): 
+        """Representa una instrucción de impresión."""
+        pass
+    class Skip(Block): 
+        """Representa una instrucción 'skip' (no-operación)."""
+        pass
+    class Guard(Block): 
+        """Representa una cláusula de guardia (condición --> instrucción) dentro de un 'if'."""
+        pass
+    class Then(Block): 
+        """Representa la parte 'then' de una cláusula de guardia o bucle while."""
+        pass
+    class TwoPoints(Block): 
+        """Representa la expresión 'expr1:expr2' para acceso a funciones."""
+        pass
 
 
-    class DeclareSection(Block): pass
-    class Sequencing(Block):pass
-    class SequencingDeclare(Block): pass
-    class Declare(Block): pass
-    class WriteFunction(Block): pass
-    class Asig(Block): pass
-    class If(Block): pass
-    class While(Block): pass
-    class Literal(Block): pass
-    class Expr(Block): pass
-    class Binary_expressions(Block):pass
-    class Literal(Block):pass
-    class Ident(Block): pass
-    class String(Block):pass
-    class UExpresson(Block): pass
-    class Print(Block): pass
-    class Skip(Block): pass
-    class Guard(Block): pass
-    class Then(Block): pass
-    class TwoPoints(Block): pass
-
-
-    # Se define la presedencia de los operadores
-    # Desde menor presedencia a mayor y agrupación a izquierda
-
+    # Definición de la precedencia de operadores.
+    # Las tuplas definen el nivel de precedencia (de menor a mayor) y la asociatividad.
     precedence = (
-        ("left", "TkOr"),
-        ("left", "TkAnd"),
-        ("left", "TkNEqual", "TkEqual"),
-        ("left", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
-        ("left", "TkComma"),
-        ("left", "TkTwoPoints"),
-        ("left", "TkPlus", "TkMinus"),
-        ("left", "TkMult"),
-        ("right", "UMinus", "TkNot"), # menos unario
-        ("left", "TkApp")  
+        ("left", "TkOr"),        # Or (menos precedencia)
+        ("left", "TkAnd"),       # And
+        ("left", "TkNEqual", "TkEqual"), # ==, <>
+        ("left", "TkLeq", "TkLess", "TkGreater", "TkGeq"), # <=, <, >, >=
+        ("left", "TkComma"),     # , (para listas de identificadores/expresiones)
+        ("left", "TkTwoPoints"), # : (para acceso a funciones tipo (expr1:expr2))
+        ("left", "TkPlus", "TkMinus"), # +, -
+        ("left", "TkMult"),      # * (mayor precedencia para operadores aritméticos)
+        ("right", "UMinus", "TkNot"), # !, - (unario, asociatividad derecha)
+        ("left", "TkApp")        # . (para aplicación de función o acceso a miembros)
     )
 
-    # Se define símbolo inicial
+    # Define el símbolo inicial de la gramática (la regla de producción de más alto nivel).
     start = "Block"
-    # Se definen las reglas de la gramatica
-    
-    # permite recurción
+
+    # --------------------------------------------------------------------------
+    # Reglas gramaticales para el parsing y construcción del AST
+    # --------------------------------------------------------------------------
+    # Cada función `p_` define una regla de producción.
+    # La docstring de la función (`"""Rule : Production"""`) es la definición de la regla.
+    # `p[0]` es el valor de la regla actual, `p[1]`, `p[2]`, etc., son los valores de los símbolos de su producción.
+
     def p_Block(p):
         """
         Block : TkOBlock DeclareSection Sequencing TkCBlock
         """
+        # Representa un bloque de código con sección de declaraciones y secuencia de instrucciones.
         p[0] = Block("Block", p[2], p[3])
 
     def p_block_only_sequencing(p):
         """
         Block : TkOBlock Sequencing TkCBlock
         """
-        p[0] = Block("Block", p[2])
+        # Representa un bloque de código solo con secuencia de instrucciones (sin declaraciones).
+        p[0] = Block("Block", p[2]) # p[2] es la secuencia de instrucciones
+
     def p_sequencing(p):
         """
         Sequencing : Sequencing TkSemicolon Instruction
         """
+        # Regla recursiva para una secuencia de instrucciones separadas por ';'.
         p[0] = Sequencing("Sequencing", p[1], p[3])
-
 
     def p_sequencing_only(p):
         """
         Sequencing : Instruction
         """
-        p[0] = p[1]
+        # Caso base para una secuencia de una sola instrucción.
+        p[0] = p[1] # El valor de la secuencia es el valor de la instrucción.
 
     def p_instruction(p):
         """
@@ -254,26 +325,28 @@ def main():
                     | Skip
                     | Block
         """
+        # Define los tipos de instrucciones válidas en el lenguaje.
         p[0] = p[1]
 
     def p_declare_section(p):
         """
         DeclareSection : SequencingDeclare
         """
+        # Define la sección de declaraciones, que es una secuencia de declaraciones.
         p[0] = DeclareSection("Declare", p[1])
-
 
     def p_sequencing_declare_recursivo(p):
         """
         SequencingDeclare : SequencingDeclare Declare TkSemicolon
         """
+        # Regla recursiva para una secuencia de declaraciones terminadas en ';'.
         p[0] = SequencingDeclare("Sequencing", p[1], p[2])
-
 
     def p_sequencing_declare(p):
         """
         SequencingDeclare : Declare TkSemicolon
         """
+        # Caso base para una secuencia de una sola declaración terminada en ';'.
         p[0] = p[1]
 
     def p_declare_int_bool(p):
@@ -281,103 +354,104 @@ def main():
         Declare : TkBool TkId
                 | TkInt TkId
         """
-        p[0] = Declare(p[2] + " : " + p[1])
-
-
+        # Regla para declarar una variable de tipo int o bool.
+        p[0] = Declare(p[2] + " : " + p[1]) # Formato "id : tipo"
 
     def p_declare_function(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId
         """
-        p[0] = Declare(p[6] + " : " + "function[.." + p[4].op + "]")
+        # Regla para declarar una función con un literal como tamaño.
+        p[0] = Declare(p[6] + " : " + "function[.." + p[4].op + "]") # Formato "id : function[..literal]"
 
-    # permite recursión
     def p_declare_int_bool_with_comma(p):
         """
         Declare : TkBool TkId Comma
                 | TkInt TkId Comma
         """
+        # Permite declarar múltiples variables del mismo tipo separadas por comas.
         p[0] = Declare(p[2] + p[3] + " : " + p[1])
-    # permite recursión
+
     def p_declare_function_with_comma(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId Comma
         """
+        # Permite declarar múltiples funciones separadas por comas.
         p[0] = Declare(p[6] + p[7] + " : " + "function[.." + p[4].op + "]")
+
     def p_comma(p):
         """
         Comma : TkComma TkId
         """
+        # Regla para el patrón de una coma seguida de un identificador.
         p[0] = p[1] + " " + p[2]
-    # permite recursión
+
     def p_comma_with_comma(p):
         """
         Comma : TkComma TkId Comma
         """
+        # Regla recursiva para múltiples identificadores separados por comas.
         p[0] = p[1] + " " + p[2] +  p[3]
+
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
         """
+        # Regla para la instrucción de asignación.
         p[0] = Asig("Asig", p[1], p[3])
-
-
-    #REvisarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
-
-
 
     def p_if(p):
         """
         If : TkIf Guard TkFi
         """
+        # Regla para la sentencia 'if' con una o más guardias.
         p[0] = If("If", p[2])
 
-    
     def p_guard0(p):
         """
         Guard : Guard TkGuard Then
         """
+        # Regla recursiva para guardias anidadas (ej: [] condición --> instrucciones).
         p[0] = Guard("Guard", p[1], p[3])
-
 
     def p_guard1(p):
         """
         Guard : Then
         """
-        p[0] = p[1]
+        # Caso base para una guardia (la primera en un 'if').
+        p[0] = p[1] # El valor de la guardia es el valor del Then.
 
     def p_while(p):
         """
         While : TkWhile Then TkEnd
         """
+        # Regla para el bucle 'while'.
         p[0] = While("While", p[2])
-
 
     def p_then(p):
         """
         Then : expression TkArrow Sequencing
         """
+        # Regla para la cláusula 'then' de una guardia o un bucle 'while'.
+        # Contiene una expresión de condición y una secuencia de instrucciones.
         p[0] = Then("Then",p[1], p[3])
 
-
-    #----------------------------------------------
-    
     def p_skip(p):
         """
         Skip : TkSkip
         """
+        # Regla para la instrucción 'skip'.
         p[0] = Skip("skip")
-        #p[0] = p[1]
-
-    
 
     def p_print(p):
         """
         Print : TkPrint expression
         """
+        # Regla para la instrucción 'print'.
         p[0] = Print("Print", p[2])
 
-    # estudiar la forma como se expresa esta gramática
+    # Reglas para expresiones binarias (aritméticas, lógicas, de comparación, aplicación, acceso).
+    # La precedencia y asociatividad se manejan con la tabla `precedence` y las reglas `terminoX`.
     def p_binary_expressions(p):
         """
         expression : expression TkOr termino0
@@ -395,6 +469,7 @@ def main():
         termino3 : termino3 TkMult factor
         factor : factor TkApp factor
         """
+        # Se mapea el token del operador a su nombre en el AST.
         if p[2] == "+":
             p[0] = Binary_expressions("Plus", p[1], p[3])
         elif p[2] == "-":
@@ -424,25 +499,31 @@ def main():
         elif p[2] == ":":
             p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
-    
     def p_unary_expression(p):
         """
         factor : TkNot factor
                | TkMinus factor %prec UMinus
         """
+        # Reglas para expresiones unarias (negación lógica o menos unario).
+        # `%prec UMinus` especifica la precedencia para el menos unario.
         if p[1] == "!":
             p[0] = UExpresson("Not", p[2])
         elif p[1] =="-":
             p[0] = UExpresson("Minus", p[2])
+            
     def p_factor(p):
         """
         factor : TkOpenPar expression TkClosePar
         """
-        p[0] = p[2]
+        # Agrupación de expresiones con paréntesis.
+        p[0] = p[2] # El valor del factor es la expresión dentro de los paréntesis.
+
     def p_factor_writefunction(p):
         """
         factor : factor TkOpenPar expression TkClosePar
         """
+        # Maneja la escritura de valores a parámetros de función (ej: `f(x)`).
+        # Se interpreta como una operación de "WriteFunction" con el nombre de la función y la expresión de acceso.
         p[0] = Binary_expressions("WriteFunction", p[1], p[3])
 
     def p_subtitutions(p):
@@ -458,72 +539,99 @@ def main():
                | Ident
                | String
         """
+        # Reglas de "sustitución" que permiten que una expresión de menor precedencia
+        # sea tratada como una de mayor precedencia en el árbol de análisis.
+        # Básicamente, pasan el valor del lado derecho al izquierdo.
         p[0] = p[1]
 
-    
-
-    
-    
     def p_ident(p):
         """
         Ident : TkId
         """
-        p[0] = Ident("Ident: " + p[1])
+        # Regla para los identificadores.
+        p[0] = Ident("Ident: " + p[1]) # Almacena el identificador con un prefijo.
+
     def p_string(p):
         """
         String : TkString
         """
-        p[0] = String("String: "+f"\"{p[1]}\"")
+        # Regla para los literales de cadena.
+        p[0] = String("String: "+f"\"{p[1]}\"") # Almacena la cadena con un prefijo y comillas.
 
-    # manejo de errores sintaticos
-    
+    # Manejo de errores sintácticos.
     def p_literal(p):
         """
         Literal : TkNum
                 | TkTrue
                 | TkFalse
         """
-        p[0] = Literal("Literal: " + str(p[1]))
+        # Regla para los literales numéricos y booleanos.
+        p[0] = Literal("Literal: " + str(p[1])) # Almacena el literal con un prefijo.
 
     def p_error(p):
+        """
+        Función de manejo de errores sintácticos.
+        Se llama automáticamente por PLY cuando se encuentra un error de sintaxis.
+        """
         if p:
+            # Si hay un token en el punto del error, intenta dar información de línea y columna.
             column = p.lexpos - p.lexer.lexdata.rfind('\n', 0, p.lexpos)
             if column <= 0: # Ajustar para casos donde el token está al inicio de línea
                 column = p.lexpos + 1
             print(f"Sintax error in row {p.lineno}, column {column}: unexpected token '{p.value}'")
         else:
+            # Si el error es al final del archivo (EOF - End Of File)
             print("Syntax error at EOF")
-        sys.exit(1)
+        sys.exit(1) # Sale del programa indicando un error.
 
-
-
-    # constructor del parser
+    # Construir el analizador sintáctico (parser).
+    # Se inicializa el parser de PLY con las reglas de gramática y la tabla de precedencia.
     parser = Yacc.yacc()
 
-    prueba = """
-                {
-                    int a;
-                    a := a(5:t).a
-                }
-                """
+    # Ejemplo de uso de la función parse (comentado en el código original, pero muestra la intención).
+    # prueba = """
+    #             {
+    #                 int a;
+    #                 a := a(5:t).a
+    #             }
+    #             """
+    # result = parser.parse(input_data) # Realiza el análisis sintáctico de los datos de entrada.
+
+    # Realiza el análisis sintáctico del contenido del archivo de entrada.
     result = parser.parse(input_data)
 
-    imprimir_ast(result,0)
-    
-    
+    # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
+    imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
 
-def imprimir_ast( arbol , n):
+# --------------------------------------------------------------------------
+# Funciones Auxiliares
+# --------------------------------------------------------------------------
 
+def imprimir_ast(arbol, n):
+    """
+    Función recursiva para imprimir el Árbol de Sintaxis Abstracta (AST).
+    Recorre el árbol en preorden, imprimiendo el operador de cada nodo
+    con una indentación que representa su nivel en el árbol.
+
+    Args:
+        arbol (Node): El nodo actual del AST a imprimir.
+        n (int): El nivel de indentación actual.
+    """
     current = arbol
     nivel = n
 
     if current != None:
-        print("-"*nivel+f"{current.op}")
+        # Imprime el operador del nodo actual, con 'nivel' guiones para indentación.
+        print("-" * nivel + f"{current.op}")
         
-        imprimir_ast( current.leftson, nivel+1)
+        # Llama recursivamente para el hijo izquierdo, aumentando el nivel de indentación.
+        imprimir_ast(current.leftson, nivel + 1)
         
-        imprimir_ast( current.rightson, nivel+1)
+        # Llama recursivamente para el hijo derecho, aumentando el nivel de indentación.
+        imprimir_ast(current.rightson, nivel + 1)
 
 
+# Punto de entrada principal del script.
+# Asegura que `main()` se ejecute solo cuando el script es ejecutado directamente.
 if __name__ == "__main__":
     main()
