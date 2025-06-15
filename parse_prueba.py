@@ -1,13 +1,13 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
-# Date: 14 de junio de 2025 (Actualizado)
+# Date: 15 de junio de 2025 (Actualizado)
 # Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores -
-#              Implementación de un analizador léxico y sintáctico para un lenguaje imperativo,
-#              con construcción de un Árbol de Sintaxis Abstracta (AST).
+#              Implementación de un analizador sintáctico para un lenguaje imperativo,
+#              con construcción de un Árbol de Sintaxis Abstracta (AST),
+#              utilizando el analizador léxico de lexer.py.
 
 import ply.yacc as Yacc  # Importa el módulo Yacc de PLY para el analizador sintáctico
-import ply.lex as Lex    # Importa el módulo Lex de PLY para el analizador léxico
 import sys               # Importa el módulo sys para acceder a argumentos de línea de comandos y salir del programa
-
+from lexer import get_lexer_and_tokens, tokens # Importa la función para obtener el lexer y la lista de tokens
 
 def main():
     """
@@ -21,7 +21,7 @@ def main():
     # Verifica que se haya proporcionado exactamente un argumento de línea de comandos (el nombre del archivo).
     if len(sys.argv) != 2:
         print("Error: Por favor proporcione un archivo .imperat como argumento")
-        print("Uso: python lexer.py archivo.imperat")
+        print("Uso: python parse.py archivo.imperat")
         sys.exit(1) # Sale del programa con un código de error
 
     # Verifica que el archivo proporcionado tenga la extensión '.imperat'.
@@ -43,151 +43,16 @@ def main():
         sys.exit(1)
 
     # --------------------------------------------------------------------------
-    # Definición del Analizador Léxico (Lexer)
+    # Inicialización del Analizador Léxico (Lexer)
     # --------------------------------------------------------------------------
-
-    # Palabras reservadas del lenguaje.
-    # Un diccionario que mapea las palabras clave (strings) a sus nombres de token.
-    reserved = {
-        "if" : "TkIf",
-        "fi" : "TkFi",
-        "end" : "TkEnd",
-        "while" : "TkWhile",
-        "or" : "TkOr",
-        "bool" : "TkBool",
-        "true" : "TkTrue",
-        "false" : "TkFalse",
-        "skip" : "TkSkip",
-        "int" : "TkInt",
-        "function" : "TkFunction",
-        "print" : "TkPrint",
-        "and" : "TkAnd"
-    }
-
-    # Lista de todos los nombres de tokens reconocidos por el lexer.
-    # Incluye tokens para operadores, delimitadores, tipos de datos, identificadores,
-    # literales y las palabras reservadas.
-    tokens = [
-        "TkOBlock" ,    # {
-        "TkCBlock" ,    # }
-        "TkSoForth" ,   # .. (operador "hasta" para funciones)
-        "TkComma" ,     # ,
-        "TkOpenPar" ,   # (
-        "TkClosePar" ,  # )
-        "TkAsig" ,      # := (operador de asignación)
-        "TkSemicolon" , # ;
-        "TkArrow" ,     # --> (separador en guardias y bucles while)
-        "TkGuard" ,     # [] (operador de guardia anidada)
-        "TkPlus" ,      # +
-        "TkMinus" ,     # -
-        "TkMult" ,      # *
-        "TkNot" ,       # ! (negación lógica)
-        "TkLess" ,      # <
-        "TkLeq" ,       # <=
-        "TkGeq" ,       # >=
-        "TkGreater" ,   # >
-        "TkEqual" ,     # ==
-        "TkNEqual" ,    # <> (no igual)
-        "TkOBracket" ,  # [
-        "TkCBracket" ,  # ]
-        "TkTwoPoints" , # : (dos puntos para acceso a funciones)
-        "TkApp",        # . (operador de aplicación o acceso a miembros)
-        "TkNum",        # Números enteros
-        "TkString",     # Cadenas de texto
-        "TkId"          # Identificadores (nombres de variables, funciones)
-    ] + list(reserved.values()) # Añade los valores de las palabras reservadas a la lista de tokens
-
-    # Definiciones de expresiones regulares para tokens simples.
-    # Cada 't_' prefijo indica una regla de token. PLY usa estas para el reconocimiento léxico.
-    t_TkOBlock = r"\{"
-    t_TkCBlock = r"\}"
-    t_TkSoForth = r"\. \."   # Expresión regular para '..'
-    t_TkComma = r"\,"       
-    t_TkOpenPar = r"\("
-    t_TkClosePar = r"\)"
-    t_TkAsig = r"\:\="
-    t_TkSemicolon = r"\;"
-    t_TkArrow = r"\-\-\>"
-    t_TkGuard = r"\[\]"
-    t_TkPlus = r"\+"
-    t_TkMinus = r"\-"
-    t_TkMult = r"\*"
-    t_TkNot = r"\!"
-    t_TkLess = r"\<"
-    t_TkLeq = r"\<\="
-    t_TkGeq = r"\>\="
-    t_TkGreater = r"\>"
-    t_TkEqual = r"\=\="
-    t_TkNEqual = r"\<\>"
-    t_TkOBracket = r"\["
-    t_TkCBracket = r"\]"
-    t_TkTwoPoints = r"\:"
-    t_TkApp = r"\."
-
-    # Tokens con reglas de expresiones regulares más complejas o lógica adicional.
-    # Estas funciones permiten realizar acciones cuando se reconoce un token.
-
-    def t_COMMENT(t):
-        r'//.*'
-        # Ignora las líneas que comienzan con '//' (comentarios de una sola línea).
-        pass  # No retorna valor, por lo tanto, el lexer ignora este token.
-        
-    def t_TkId(t):
-        r"[a-zA-Z_][a-zA-Z_0-9]*"
-        # Reconoce identificadores que comienzan con una letra o guion bajo, seguidos de letras, números o guiones bajos.
-        # Verifica si el identificador es una palabra reservada. Si lo es, su tipo de token cambia al de la palabra reservada.
-        t.type = reserved.get(t.value, "TkId")
-        return t
-
-    def t_TkString(t):
-        r'"[^"\\\n]*(?:\\[n"\\][^"\\\n]*)*"'
-        # Reconoce cadenas de texto encerradas entre comillas dobles, permitiendo caracteres escapados como \n, \", \\.
-        t.value = t.value[1:-1]  # Elimina las comillas del principio y final del valor del token.
-        return t
-
-    def t_TkNum(t):
-        r"\d+"
-        # Reconoce secuencias de uno o más dígitos como números enteros.
-        t.value = int(t.value)   # Convierte la cadena de dígitos a un valor entero.
-        return t
-
-    # Manejo de errores léxicos.
-    # Lista para almacenar los errores léxicos encontrados.
-    errors = []  
-
-    def t_error(t):
-        # Función que se llama cuando el lexer encuentra un carácter inesperado.
-        # Calcula la columna del error para un mensaje más informativo.
-        column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
-        if column <= 0: # Ajustar para casos donde el token está al inicio de la línea
-            column = t.lexpos + 1
-        errors.append(f"Error: Carácter inesperado \"{t.value[0]}\" en fila {t.lineno}, columna {column}")
-        t.lexer.skip(1) # Avanza el lexer un carácter para intentar recuperarse.
-
-    # Actualizar la posición de la columna.
-    # Esta función auxiliar calcula la columna de un token en una línea determinada.
-    def find_column(input, token):
-        last_cr = input.rfind('\n', 0, token.lexpos)
-        if last_cr < 0:
-            last_cr = -1
-        column = (token.lexpos - last_cr)
-        return column
-
-    # Tokens ignorados por el lexer (espacios en blanco y tabulaciones).
-    t_ignore = " \t"
-
-    # Conteo de líneas.
-    # Actualiza el número de línea del lexer cada vez que encuentra uno o más saltos de línea.
-    def t_newline( t ):
-        r"\n+"
-        t.lexer.lineno += len(t.value)
-
-    # Construir el analizador léxico (lexer).
-    # Se inicializa el lexer de PLY con las reglas definidas.
-    lexer = Lex.lex()
-
-    # Alimentar el lexer con los datos de entrada para generar los tokens.
-    lexer.input(input_data)
+    # Obtiene el lexer configurado y la lista de errores léxicos desde el módulo lexer.py.
+    lexer, lexer_tokens, lexer_errors = get_lexer_and_tokens(input_data)
+    
+    # Si se encontraron errores léxicos, reportarlos y salir.
+    if lexer_errors:
+        for error in lexer_errors:
+            print(error)
+        sys.exit(1)
 
     # --------------------------------------------------------------------------
     # Definición del Analizador Sintáctico (Parser) y la Construcción del AST
@@ -588,20 +453,15 @@ def main():
     # Se inicializa el parser de PLY con las reglas de gramática y la tabla de precedencia.
     parser = Yacc.yacc()
 
-    # Ejemplo de uso de la función parse (comentado en el código original, pero muestra la intención).
-    # prueba = """
-    #             {
-    #                 int a;
-    #                 a := a(5:t).a
-    #             }
-    #             """
-    # result = parser.parse(input_data) # Realiza el análisis sintáctico de los datos de entrada.
-
     # Realiza el análisis sintáctico del contenido del archivo de entrada.
-    result = parser.parse(input_data)
+    result = parser.parse(input_data, lexer=lexer) # Pasa el lexer explícitamente al parser.
 
     # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
-    imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+    if result:
+        imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+    else:
+        print("Parsing completado, pero no se generó AST (posiblemente por entrada vacía o errores de sintaxis).")
+
 
 # --------------------------------------------------------------------------
 # Funciones Auxiliares
