@@ -1,202 +1,156 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
-# Date: 19-05-2025
-# Description: Proyecto Etapa1 CI-3725 Traductores e Interpretadores 
+# Date: 15 de junio de 2025 (Actualizado)
+# Description: Analizador léxico (lexer) para el lenguaje imperativo,
+#              utilizando PLY. Contiene la definición de tokens y reglas léxicas.
 
-import ply.yacc as Yacc
-import ply.lex as Lex
-import sys
+import ply.lex as Lex    # Importa el módulo Lex de PLY para el analizador léxico
 
+# Palabras reservadas del lenguaje.
+# Un diccionario que mapea las palabras clave (strings) a sus nombres de token.
+reserved = {
+    "if" : "TkIf",
+    "fi" : "TkFi",
+    "end" : "TkEnd",
+    "while" : "TkWhile",
+    "or" : "TkOr",
+    "bool" : "TkBool",
+    "true" : "TkTrue",
+    "false" : "TkFalse",
+    "skip" : "TkSkip",
+    "int" : "TkInt",
+    "function" : "TkFunction",
+    "print" : "TkPrint",
+    "and" : "TkAnd"
+}
 
-def main():
-    """El algoritmo recibe como algoritmo de línea de comando el archivo.
-        Hace un análisis de caracteres del archivo, reconoce los tokens
-        del lenguaje e indica medinate errores por terminal cuando un 
-        caracter que no pertenece a la gramática es introducido.
+# Lista de todos los nombres de tokens reconocidos por el lexer.
+# Incluye tokens para operadores, delimitadores, tipos de datos, identificadores,
+# literales y las palabras reservadas.
+tokens = [
+    "TkOBlock" ,    # {
+    "TkCBlock" ,    # }
+    "TkSoForth" ,   # .. (operador "hasta" para funciones)
+    "TkComma" ,     # ,
+    "TkOpenPar" ,   # (
+    "TkClosePar" ,  # )
+    "TkAsig" ,      # := (operador de asignación)
+    "TkSemicolon" , # ;
+    "TkArrow" ,     # --> (separador en guardias y bucles while)
+    "TkGuard" ,     # [] (operador de guardia anidada)
+    "TkPlus" ,      # +
+    "TkMinus" ,     # -
+    "TkMult" ,      # *
+    "TkNot" ,       # ! (negación lógica)
+    "TkLess" ,      # <
+    "TkLeq" ,       # <=
+    "TkGeq" ,       # >=
+    "TkGreater" ,   # >
+    "TkEqual" ,     # ==
+    "TkNEqual" ,    # <> (no igual)
+    "TkOBracket" ,  # [
+    "TkCBracket" ,  # ]
+    "TkTwoPoints" , # : (dos puntos para acceso a funciones)
+    "TkApp",        # . (operador de aplicación o acceso a miembros)
+    "TkNum",        # Números enteros
+    "TkString",     # Cadenas de texto
+    "TkId"          # Identificadores (nombres de variables, funciones)
+] + list(reserved.values()) # Añade los valores de las palabras reservadas a la lista de tokens
+
+# Definiciones de expresiones regulares para tokens simples.
+# Cada 't_' prefijo indica una regla de token. PLY usa estas para el reconocimiento léxico.
+t_TkOBlock = r"\{"
+t_TkCBlock = r"\}"
+t_TkSoForth = r"\. \."   # Expresión regular para '..'
+t_TkComma = r"\,"       
+t_TkOpenPar = r"\("
+t_TkClosePar = r"\)"
+t_TkAsig = r"\:\="
+t_TkSemicolon = r"\;"
+t_TkArrow = r"\-\-\>"
+t_TkGuard = r"\[\]"
+t_TkPlus = r"\+"
+t_TkMinus = r"\-"
+t_TkMult = r"\*"
+t_TkNot = r"\!"
+t_TkLess = r"\<"
+t_TkLeq = r"\<\="
+t_TkGeq = r"\>\="
+t_TkGreater = r"\>"
+t_TkEqual = r"\=\="
+t_TkNEqual = r"\<\>"
+t_TkOBracket = r"\["
+t_TkCBracket = r"\]"
+t_TkTwoPoints = r"\:"
+t_TkApp = r"\."
+
+# Tokens con reglas de expresiones regulares más complejas o lógica adicional.
+# Estas funciones permiten realizar acciones cuando se reconoce un token.
+
+def t_COMMENT(t):
+    r'//.*'
+    # Ignora las líneas que comienzan con '//' (comentarios de una sola línea).
+    pass  # No retorna valor, por lo tanto, el lexer ignora este token.
+    
+def t_TkId(t):
+    r"[a-zA-Z_][a-zA-Z_0-9]*"
+    # Reconoce identificadores que comienzan con una letra o guion bajo, seguidos de letras, números o guiones bajos.
+    # Verifica si el identificador es una palabra reservada. Si lo es, su tipo de token cambia al de la palabra reservada.
+    t.type = reserved.get(t.value, "TkId")
+    return t
+
+def t_TkString(t):
+    r'"[^"\\\n]*(?:\\[n"\\][^"\\\n]*)*"'
+    # Reconoce cadenas de texto encerradas entre comillas dobles, permitiendo caracteres escapados como \n, \", \\.
+    t.value = t.value[1:-1]  # Elimina las comillas del principio y final del valor del token.
+    return t
+
+def t_TkNum(t):
+    r"\d+"
+    # Reconoce secuencias de uno o más dígitos como números enteros.
+    t.value = int(t.value)   # Convierte la cadena de dígitos a un valor entero.
+    return t
+
+# Lista global para almacenar los errores léxicos encontrados.
+errors = []  
+
+def t_error(t):
+    # Función que se llama cuando el lexer encuentra un carácter inesperado.
+    # Calcula la columna del error para un mensaje más informativo.
+    column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
+    if column <= 0: # Ajustar para casos donde el token está al inicio de la línea
+        column = t.lexpos + 1
+    errors.append(f"Error: Carácter inesperado \"{t.value[0]}\" en fila {t.lineno}, columna {column}")
+    t.lexer.skip(1) # Avanza el lexer un carácter para intentar recuperarse.
+
+# Tokens ignorados por el lexer (espacios en blanco y tabulaciones).
+t_ignore = " \t"
+
+# Conteo de líneas.
+# Actualiza el número de línea del lexer cada vez que encuentra uno o más saltos de línea.
+def t_newline( t ):
+    r"\n+"
+    t.lexer.lineno += len(t.value)
+
+def get_lexer_and_tokens(input_data):
     """
-    # Verificar que se proporcionó un archivo como argumento
-    if len(sys.argv) != 2:
-        print("Error: Por favor proporcione un archivo .imperat como argumento")
-        print("Uso: python lexer.py archivo.imperat")
-        sys.exit(1)
+    Función para construir y obtener el objeto lexer de PLY y la lista de tokens.
 
-    # Verificar que el archivo tenga la extensión correcta
-    if not sys.argv[1].endswith('.imperat'):
-        print("Error: El archivo debe tener extensión .imperat")
-        sys.exit(1)
+    Args:
+        input_data (str): La cadena de texto del programa fuente a analizar.
 
-    # Intentar abrir y leer el archivo
-    try:
-        with open(sys.argv[1], 'r') as file:
-            input_data = file.read()
-    except FileNotFoundError:
-        print(f"Error: No se encontró el archivo {sys.argv[1]}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error al leer el archivo: {str(e)}")
-        sys.exit(1)
+    Returns:
+        tuple: Una tupla que contiene:
+            - lexer (ply.lex.Lexer): El objeto lexer configurado.
+            - tokens (list): La lista de nombres de tokens reconocidos.
+            - errors (list): La lista de errores léxicos encontrados durante el análisis inicial.
+    """
+    # Reinicia la lista de errores para cada nueva llamada.
+    global errors
+    errors = [] 
 
-    # palabras reservadas del lenguaje
-    reserved = {
-        "if" : "TkIf",
-        "fi" : "TkFi",
-        "end" : "TkEnd",
-        "while" : "TkWhile",
-        "or" : "TkOr",
-        "bool" : "TkBool",
-        "true" : "TkTrue",
-        "false" : "TkFalse",
-        "skip" : "TkSkip",
-        "int" : "TkInt",
-        "function" : "TkFunction",
-        "print" : "TkPrint",
-        "and" : "TkAnd"
-    }
-
-    tokens = [
-        "TkOBlock" ,
-        "TkCBlock" ,
-        "TkSoForth" ,
-        "TkComma" ,
-        "TkOpenPar" ,
-        "TkClosePar" ,
-        "TkAsig" ,
-        "TkSemicolon" ,
-        "TkArrow" ,
-        "TkGuard" ,
-        "TkPlus" ,
-        "TkMinus" ,
-        "TkMult" ,
-        "TkNot" ,
-        "TkLess" ,
-        "TkLeq" ,
-        "TkGeq" ,
-        "TkGreater" ,
-        "TkEqual" ,
-        "TkNEqual" ,
-        "TkOBracket" ,
-        "TkCBracket" ,
-        "TkTowPoints" ,
-        "TkApp",
-        "TkNum",
-        "TkString",
-        "TkId"
-
-    ] + list(reserved.values())
-
-
-
-    # tokens sencillos
-
-    t_TkOBlock = r"\{"
-    t_TkCBlock = r"\}"
-    t_TkSoForth = r"\. \."   
-    t_TkComma = r"\,"       
-    t_TkOpenPar = r"\("
-    t_TkClosePar = r"\)"
-    t_TkAsig = r"\:\="
-    t_TkSemicolon = r"\;"
-    t_TkArrow = r"\-\-\>"
-    t_TkGuard = r"\[\]"
-    t_TkPlus = r"\+"
-    t_TkMinus = r"\-"
-    t_TkMult = r"\*"
-    t_TkNot = r"\!"
-    t_TkLess = r"\<"
-    t_TkLeq = r"\<\="
-    t_TkGeq = r"\>\="
-    t_TkGreater = r"\>"
-    t_TkEqual = r"\=\="
-    t_TkNEqual = r"\<\>"
-    t_TkOBracket = r"\["
-    t_TkCBracket = r"\]"
-    t_TkTowPoints = r"\:"
-    t_TkApp = r"\."
-
-    # tokens especiales
-
-    def t_COMMENT(t):
-        r'//.*'
-        pass  # No retorna nada - ignora los comentarios
-        
-    def t_TkId(t):
-        r"[a-zA-Z_][a-zA-Z_0-9]*"
-        t.type = reserved.get(t.value, "TkId")
-        return t
-
-    def t_TkString(t):
-        r'"[^"\\\n]*(?:\\[n"\\][^"\\\n]*)*"'
-        t.value = t.value[1:-1]  # Remover las comillas
-        return t
-
-    def t_TkNum(t):
-        r"\d+"
-        t.value = int(t.value)
-        return t
-
-    # manejo de errores 
-    errors = []  # Lista para almacenar errores
-
-    def t_error(t):
-        column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
-        if column <= 0:
-            column = t.lexpos + 1
-        errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
-        t.lexer.skip(1)
-
-    # Actualizar la posición de la columna
-    def find_column(input, token):
-        last_cr = input.rfind('\n', 0, token.lexpos)
-        if last_cr < 0:
-            last_cr = -1
-        column = (token.lexpos - last_cr)
-        return column
-
-    # tokens ignorados
-
-    t_ignore = " \t"
-
-    # conteo de lineas 
+    # Construir el analizador léxico (lexer).
+    _lexer = Lex.lex()
+    _lexer.input(input_data) # Alimentar el lexer con los datos de entrada para generar los tokens.
     
-    def t_newline( t ):
-        r"\n+"
-        t.lexer.lineno += len(t.value)
+    return _lexer, tokens, errors
 
-
-    # llamada al contructor lexico
-
-    lexer = Lex.lex()
-
-
-
-    # entrada de la data
-
-    lexer.input(input_data)
-
-    # Lista para almacenar tokens
-    tokens_found = []
-    
-    # procesamiento del dato
-    for tok in lexer:
-        column = find_column(input_data, tok)
-        if (tok.type == "TkNum"):
-            tokens_found.append(f"{tok.type}({tok.value}) {tok.lineno} {column}")
-        elif (tok.type == "TkId"):
-            tokens_found.append(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
-        elif (tok.type == "TkString"):
-            tokens_found.append(f"{tok.type}(\"{tok.value}\") {tok.lineno} {column}")
-        else:
-            tokens_found.append(f"{tok.type} {tok.lineno} {column}")
-
-    # Si hay errores, solo mostrar los errores
-    if errors:
-        for error in errors:
-            print(error)
-    else:
-        # Si no hay errores, mostrar los tokens
-        for token in tokens_found:
-            print(token)
-
-
-
-if __name__ == "__main__":
-    main()
