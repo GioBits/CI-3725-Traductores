@@ -246,12 +246,17 @@ def main():
         """
         # Regla para declarar una variable de tipo int o bool.
         p[0] = Declare(None, [p[1], [p[2]]]) # Formato "id : tipo"
+
+        SimbolTable[p[2]] = p[1]
+
     def p_declare_function(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId
         """
         # Regla para declarar una función con un literal como tamaño.
         p[0] = Declare( None ,[ "function[.." + p[4].value + "]", [p[6]]]) # Formato "id : function[..literal]"
+
+        SimbolTable[p[6]] = "function[.." + p[4].value + "]"
 
     def p_declare_int_bool_with_comma(p):
         """
@@ -261,6 +266,10 @@ def main():
         # Permite declarar múltiples variables del mismo tipo separadas por comas.
         p[0] = Declare(None, [p[1], [p[2]] + p[3] ])
 
+        SimbolTable[p[2]] = p[1]
+        for variale in p[3]:
+            SimbolTable[variale] = p[1]
+
     def p_declare_function_with_comma(p):
         """
         Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId Comma
@@ -268,6 +277,9 @@ def main():
         # Permite declarar múltiples funciones separadas por comas.
         p[0] = Declare( None, ["function[.." + p[4].value + "]" ,[p[6]] + p[7]])
 
+        SimbolTable[p[6]] = "function[.." + p[4].value + "]"
+        for variable in p[7]:
+            SimbolTable[varialbe] = "function[.." + p[4].value + "]"
     def p_comma(p):
         """
         Comma : TkComma TkId
@@ -483,6 +495,8 @@ def main():
     # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
     if result:
         imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+        for clave, valor in SimbolTable.items():
+            print(clave, valor)
     else:
         print("Parsing completado, pero no se generó AST (posiblemente por entrada vacía o errores de sintaxis).")
 
