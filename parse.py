@@ -9,6 +9,115 @@ import ply.yacc as Yacc  # Importa el módulo Yacc de PLY para el analizador sin
 import sys               # Importa el módulo sys para acceder a argumentos de línea de comandos y salir del programa
 from lexer import get_lexer_and_tokens, tokens # Importa la función para obtener el lexer y la lista de tokens
 
+
+class Block():
+    """Representa un bloque de código."""
+    def __init__(self,op = None, leftson = None, rightson = None, value = None):
+        self.op = op          # Operador o tipo de nodo (ej: "Block")
+        self.leftson = leftson  # Hijo izquierdo del nodo
+        self.rightson = rightson # Hijo derecho del nodo
+        self.value = value
+    def __str__(self):
+        return f"{self.op}"
+
+class DeclareSection(): 
+    """Representa la sección de declaraciones dentro de un bloque."""
+    def __init__(self,op = None, children = None):
+        self.op = op          # Operador o tipo de nodo (ej: "Block")
+        self.children = children
+    def __str__(self):
+        return f"{self.op}"
+        
+    def imprimir_declares(self, nivel):
+        for son in self.children:
+            tupla = son.VariableAndType
+            for variale in tupla[1]:
+                print("-" * nivel, f"variable: {variale} | type: {tupla[0]}", sep="")
+
+                #print("-" * nivel, son, sep="")
+
+class Sequencing(Block):
+    """Representa una secuencia de instrucciones o declaraciones."""
+    pass
+
+
+class SequencingDeclare(Block): 
+    """Representa una secuencia de declaraciones específicas."""
+    pass
+
+class Declare(): 
+    """Representa una declaración individual (variable o función)."""
+    def __init__(self, op = None, VariableAndType = []):
+        self.op = op
+        self.VariableAndType = VariableAndType
+        #self.VariableAndType[VariableAndType[0]] = VariableAndType[1]
+
+class WriteFunction(Block): 
+    """Representa la escritura de valores a parámetros de una función."""
+    pass
+class Asig(Block): 
+    """Representa una instrucción de asignación."""
+    pass
+class If(Block): 
+    """Representa una sentencia condicional 'if' con guardias."""
+    pass
+class While(Block): 
+    """Representa una sentencia de bucle 'while'."""
+    pass
+class Literal(): 
+    """Representa un valor literal (número, true, false)."""
+    def __init__(self,op = None, value = None, type = None):
+        self.op = op          # Operador o tipo de nodo (ej: "Block")
+        self.value = value
+        self.type = type
+    def __str__(self):
+        return f"Literal: {self.value} | type: {self.type}"
+class Expr(Block): 
+    """Clase base para expresiones."""
+    pass
+class Binary_expressions():
+    """Representa una operación binaria (ej: suma, resta, AND, OR)."""
+    def __init__(self,op = None, leftson = None, rightson = None, type = None):
+        self.op = op          # Operador o tipo de nodo (ej: "Block")
+        self.leftson = leftson  # Hijo izquierdo del nodo
+        self.rightson = rightson # Hijo derecho del nodo
+        self.type = type
+    def __str__(self):
+        if self.type != None:
+            return f"{self.op} | type: {self.type}"
+        else:
+            return f"{self.op}"
+
+class Ident(): 
+    """Representa un identificador (nombre de variable o función)."""
+    def __init__(self,op = None, value = None, type = None):
+        self.op = op  
+        self.value = value        # Operador o tipo de nodo (ej: "Block")
+        self.type = type
+    def __str__(self):
+        return f"Ident: {self.value} | type: {self.type}"
+class String(Block):
+    """Representa un literal de cadena de texto."""
+    pass
+class UExpresson(Block): 
+    """Representa una operación unaria (ej: negación, menos unario)."""
+    pass
+class Print(Block): 
+    """Representa una instrucción de impresión."""
+    pass
+class Skip(Block): 
+    """Representa una instrucción 'skip' (no-operación)."""
+    pass
+class Guard(Block): 
+    """Representa una cláusula de guardia (condición --> instrucción) dentro de un 'if'."""
+    pass
+class Then(Block): 
+    """Representa la parte 'then' de una cláusula de guardia o bucle while."""
+    pass
+class TwoPoints(Block): 
+    """Representa la expresión 'expr1:expr2' para acceso a funciones."""
+    pass
+
 def main():
     """
     Función principal del programa.
@@ -62,94 +171,7 @@ def main():
     # Cada clase representa un tipo de construcción sintáctica del lenguaje.
     # Los nodos almacenan el operador de la construcción y sus hijos (sub-árboles).
 
-    class Block():
-        """Representa un bloque de código."""
-        def __init__(self,op = None, leftson = None, rightson = None, value = None):
-            self.op = op          # Operador o tipo de nodo (ej: "Block")
-            self.leftson = leftson  # Hijo izquierdo del nodo
-            self.rightson = rightson # Hijo derecho del nodo
-            self.value = value
-        def __str__(self):
-            return f"{self.op}"
 
-    class DeclareSection(): 
-        """Representa la sección de declaraciones dentro de un bloque."""
-        def __init__(self,op = None, children = None):
-            self.op = op          # Operador o tipo de nodo (ej: "Block")
-            self.children = children
-            
-        def imprimir_declares(self, nivel):
-            for son in self.children:
-                tupla = son.VariableAndType
-                for variale in tupla[1]:
-                    print("-" * nivel, f"variable: {variale} | type: {tupla[0]}", sep="")
-
-                    #print("-" * nivel, son, sep="")
-
-    class Sequencing(Block):
-        """Representa una secuencia de instrucciones o declaraciones."""
-        pass
-
-
-    class SequencingDeclare(Block): 
-        """Representa una secuencia de declaraciones específicas."""
-        pass
-
-    class Declare(): 
-        """Representa una declaración individual (variable o función)."""
-        def __init__(self, op = None, VariableAndType = []):
-            self.op = op
-            self.VariableAndType = VariableAndType
-            #self.VariableAndType[VariableAndType[0]] = VariableAndType[1]
-        def __str__(self):
-            for variale in self.VariableAndType[1]:
-                return f"variable: {variale} | type: {self.VariableAndType[0]}"
-
-    class WriteFunction(Block): 
-        """Representa la escritura de valores a parámetros de una función."""
-        pass
-    class Asig(Block): 
-        """Representa una instrucción de asignación."""
-        pass
-    class If(Block): 
-        """Representa una sentencia condicional 'if' con guardias."""
-        pass
-    class While(Block): 
-        """Representa una sentencia de bucle 'while'."""
-        pass
-    class Literal(Block): 
-        """Representa un valor literal (número, true, false)."""
-        pass
-    class Expr(Block): 
-        """Clase base para expresiones."""
-        pass
-    class Binary_expressions(Block):
-        """Representa una operación binaria (ej: suma, resta, AND, OR)."""
-        pass
-    class Ident(Block): 
-        """Representa un identificador (nombre de variable o función)."""
-        pass
-    class String(Block):
-        """Representa un literal de cadena de texto."""
-        pass
-    class UExpresson(Block): 
-        """Representa una operación unaria (ej: negación, menos unario)."""
-        pass
-    class Print(Block): 
-        """Representa una instrucción de impresión."""
-        pass
-    class Skip(Block): 
-        """Representa una instrucción 'skip' (no-operación)."""
-        pass
-    class Guard(Block): 
-        """Representa una cláusula de guardia (condición --> instrucción) dentro de un 'if'."""
-        pass
-    class Then(Block): 
-        """Representa la parte 'then' de una cláusula de guardia o bucle while."""
-        pass
-    class TwoPoints(Block): 
-        """Representa la expresión 'expr1:expr2' para acceso a funciones."""
-        pass
 
     SimbolTable = {}
 
@@ -372,31 +394,31 @@ def main():
         """
         # Se mapea el token del operador a su nombre en el AST.
         if p[2] == "+":
-            p[0] = Binary_expressions("Plus", p[1], p[3])
+            p[0] = Binary_expressions("Plus", p[1], p[3], "int")
         elif p[2] == "-":
-            p[0] = Binary_expressions("Minus", p[1], p[3])
+            p[0] = Binary_expressions("Minus | type: int", p[1], p[3], "int")
         elif p[2] == "and":
-            p[0] = Binary_expressions("And", p[1], p[3])
+            p[0] = Binary_expressions("And", p[1], p[3], "bool")
         elif p[2] == ".":
-            p[0] = Binary_expressions("App", p[1], p[3])
+            p[0] = Binary_expressions("App", p[1], p[3], "int")
         elif p[2] == "*":
-            p[0] = Binary_expressions("Mult", p[1], p[3])
+            p[0] = Binary_expressions("Mult", p[1], p[3], "int")
         elif p[2] == "or":
-            p[0] = Binary_expressions("Or", p[1], p[3])
+            p[0] = Binary_expressions("Or", p[1], p[3], "bool")
         elif p[2] == "==":
-            p[0] = Binary_expressions("Equal", p[1], p[3])
+            p[0] = Binary_expressions("Equal", p[1], p[3], "bool")
         elif p[2] == "<>":
-            p[0] = Binary_expressions("NotEqual", p[1], p[3])
+            p[0] = Binary_expressions("NotEqual", p[1], p[3], "bool")
         elif p[2] == "<=":
-            p[0] = Binary_expressions("Leq", p[1], p[3])
+            p[0] = Binary_expressions("Leq", p[1], p[3], "bool")
         elif p[2] == "<":
-            p[0] = Binary_expressions("Less", p[1], p[3])
+            p[0] = Binary_expressions("Less", p[1], p[3], "bool")
         elif p[2] == ">=":
-            p[0] = Binary_expressions("Geq", p[1], p[3])
+            p[0] = Binary_expressions("Geq", p[1], p[3], "bool")
         elif p[2] == ">":
-            p[0] = Binary_expressions("Greater", p[1],p[3])
+            p[0] = Binary_expressions("Greater", p[1],p[3], "bool")
         elif p[2] == ",":
-            p[0] = Binary_expressions("Comma", p[1], p[3])
+            p[0] = Binary_expressions("Comma", p[1], p[3], "function with lenght=2") # tener cuidado con el largo de las comas
         elif p[2] == ":":
             p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
@@ -425,7 +447,7 @@ def main():
         """
         # Maneja la escritura de valores a parámetros de función (ej: `f(x)`).
         # Se interpreta como una operación de "WriteFunction" con el nombre de la función y la expresión de acceso.
-        p[0] = Binary_expressions("WriteFunction", p[1], p[3])
+        p[0] = Binary_expressions("WriteFunction", p[1], p[3], p[1].type)
 
     def p_subtitutions(p):
         """
@@ -450,7 +472,7 @@ def main():
         Ident : TkId
         """
         # Regla para los identificadores.
-        p[0] = Ident("Ident: " + p[1]) # Almacena el identificador con un prefijo.
+        p[0] = Ident(value = p[1], type=SimbolTable[p[1]]) # Almacena el identificador con un prefijo.
 
     def p_string(p):
         """
@@ -460,14 +482,20 @@ def main():
         p[0] = String("String: "+f"\"{p[1]}\"") # Almacena la cadena con un prefijo y comillas.
 
     # Manejo de errores sintácticos.
-    def p_literal(p):
+    def p_literal_num(p):
         """
         Literal : TkNum
-                | TkTrue
+        """
+        # Regla para los literales numéricos y booleanos.
+        p[0] = Literal(None, value=str(p[1]), type="int") # Almacena el literal con un prefijo.
+
+    def p_literal_bool(p):
+        """
+        Literal : TkTrue
                 | TkFalse
         """
         # Regla para los literales numéricos y booleanos.
-        p[0] = Literal("Literal: " + str(p[1]), value=str(p[1])) # Almacena el literal con un prefijo.
+        p[0] = Literal(None, value=str(p[1]), type = "bool") # Almacena el literal con un prefijo.
 
     def p_error(p):
         """
@@ -495,8 +523,6 @@ def main():
     # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
     if result:
         imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
-        for clave, valor in SimbolTable.items():
-            print(clave, valor)
     else:
         print("Parsing completado, pero no se generó AST (posiblemente por entrada vacía o errores de sintaxis).")
 
@@ -520,12 +546,26 @@ def imprimir_ast(arbol, n):
 
     if current != None:
         # Imprime el operador del nodo actual, con 'nivel' guiones para indentación.
-        print("-" * nivel + f"{current.op}")
-
-        if current.op == "Symbols Table":
-            current.imprimir_declares(nivel+1)
         
-        else:    
+
+        if isinstance(current, DeclareSection):
+            print("-" * nivel + f"{current.op}")
+            current.imprimir_declares(nivel+1)
+
+        elif isinstance(current, Binary_expressions):
+            print("-" * nivel,current, sep="")
+            # Llama recursivamente para el hijo izquierdo, aumentando el nivel de indentación.
+            imprimir_ast(current.leftson, nivel + 1)
+            
+            # Llama recursivamente para el hijo derecho, aumentando el nivel de indentación.
+            imprimir_ast(current.rightson, nivel + 1)
+
+        elif isinstance(current, Literal):
+            print("-" * nivel,current, sep="")
+        elif isinstance(current, Ident):
+            print("-" * nivel,current, sep="")
+        else:
+            print("-" * nivel + f"{current.op}")    
             # Llama recursivamente para el hijo izquierdo, aumentando el nivel de indentación.
             imprimir_ast(current.leftson, nivel + 1)
             
