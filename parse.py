@@ -1,244 +1,210 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
-# Date: 
-# Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores 
+# Date: 15 de junio de 2025 (Actualizado)
+# Description: Proyecto Etapa2 CI-3725 Traductores e Interpretadores -
+#              Implementación de un analizador sintáctico para un lenguaje imperativo,
+#              con construcción de un Árbol de Sintaxis Abstracta (AST),
+#              utilizando el analizador léxico de lexer.py.
 
-import ply.yacc as Yacc
-import ply.lex as Lex
-import sys
-
+import ply.yacc as Yacc  # Importa el módulo Yacc de PLY para el analizador sintáctico
+import sys               # Importa el módulo sys para acceder a argumentos de línea de comandos y salir del programa
+from lexer import get_lexer_and_tokens, tokens # Importa la función para obtener el lexer y la lista de tokens
 
 def main():
-    # Verificar que se proporcionó un archivo como argumento
+    """
+    Función principal del programa.
+    Gestiona la entrada de archivos, el proceso de análisis léxico y sintáctico,
+    y la impresión del Árbol de Sintaxis Abstracta (AST) resultante.
+    """
+    # --------------------------------------------------------------------------
+    # Gestión de la entrada de archivos
+    # --------------------------------------------------------------------------
+    # Verifica que se haya proporcionado exactamente un argumento de línea de comandos (el nombre del archivo).
     if len(sys.argv) != 2:
         print("Error: Por favor proporcione un archivo .imperat como argumento")
-        print("Uso: python lexer.py archivo.imperat")
-        sys.exit(1)
+        print("Uso: python parse.py archivo.imperat")
+        sys.exit(1) # Sale del programa con un código de error
 
-    # Verificar que el archivo tenga la extensión correcta
+    # Verifica que el archivo proporcionado tenga la extensión '.imperat'.
     if not sys.argv[1].endswith('.imperat'):
         print("Error: El archivo debe tener extensión .imperat")
-        sys.exit(1)
+        sys.exit(1) # Sale del programa con un código de error
 
-    # Intentar abrir y leer el archivo
+    # Intenta abrir y leer el contenido del archivo de entrada.
     try:
         with open(sys.argv[1], 'r') as file:
             input_data = file.read()
     except FileNotFoundError:
+        # Captura el error si el archivo no se encuentra
         print(f"Error: No se encontró el archivo {sys.argv[1]}")
         sys.exit(1)
     except Exception as e:
+        # Captura cualquier otro error durante la lectura del archivo
         print(f"Error al leer el archivo: {str(e)}")
         sys.exit(1)
 
-    # palabras reservadas del lenguaje
-    reserved = {
-        "if" : "TkIf",
-        "fi" : "TkFi",
-        "end" : "TkEnd",
-        "while" : "TkWhile",
-        "or" : "TkOr",
-        "bool" : "TkBool",
-        "true" : "TkTrue",
-        "false" : "TkFalse",
-        "skip" : "TkSkip",
-        "int" : "TkInt",
-        "function" : "TkFunction",
-        "print" : "TkPrint",
-        "and" : "TkAnd"
-    }
-
-    tokens = [
-        "TkOBlock" ,
-        "TkCBlock" ,
-        "TkSoForth" ,
-        "TkComma" ,
-        "TkOpenPar" ,
-        "TkClosePar" ,
-        "TkAsig" ,
-        "TkSemicolon" ,
-        "TkArrow" ,
-        "TkGuard" ,
-        "TkPlus" ,
-        "TkMinus" ,
-        "TkMult" ,
-        "TkNot" ,
-        "TkLess" ,
-        "TkLeq" ,
-        "TkGeq" ,
-        "TkGreater" ,
-        "TkEqual" ,
-        "TkNEqual" ,
-        "TkOBracket" ,
-        "TkCBracket" ,
-        "TkTowPoints" ,
-        "TkApp",
-        "TkNum",
-        "TkString",
-        "TkId"
-
-    ] + list(reserved.values())
-
-
-
-    # tokens sencillos
-
-    t_TkOBlock = r"\{"
-    t_TkCBlock = r"\}"
-    t_TkSoForth = r"\. \."   
-    t_TkComma = r"\,"       
-    t_TkOpenPar = r"\("
-    t_TkClosePar = r"\)"
-    t_TkAsig = r"\:\="
-    t_TkSemicolon = r"\;"
-    t_TkArrow = r"\-\-\>"
-    t_TkGuard = r"\[\]"
-    t_TkPlus = r"\+"
-    t_TkMinus = r"\-"
-    t_TkMult = r"\*"
-    t_TkNot = r"\!"
-    t_TkLess = r"\<"
-    t_TkLeq = r"\<\="
-    t_TkGeq = r"\>\="
-    t_TkGreater = r"\>"
-    t_TkEqual = r"\=\="
-    t_TkNEqual = r"\<\>"
-    t_TkOBracket = r"\["
-    t_TkCBracket = r"\]"
-    t_TkTowPoints = r"\:"
-    t_TkApp = r"\."
-
-    # tokens especiales
-
-    def t_COMMENT(t):
-        r'//.*'
-        pass  # No retorna nada - ignora los comentarios
-        
-    def t_TkId(t):
-        r"[a-zA-Z_][a-zA-Z_0-9]*"
-        t.type = reserved.get(t.value, "TkId")
-        return t
-
-    def t_TkString(t):
-        r'"[^"\\\n]*(?:\\[n"\\][^"\\\n]*)*"'
-        t.value = t.value[1:-1]  # Remover las comillas
-        return t
-
-    def t_TkNum(t):
-        r"\d+"
-        t.value = int(t.value)
-        return t
-
-    # manejo de errores 
-    errors = []  # Lista para almacenar errores
-
-    def t_error(t):
-        column = t.lexpos - t.lexer.lexdata.rfind('\n', 0, t.lexpos)
-        if column <= 0:
-            column = t.lexpos + 1
-        errors.append(f"Error: Unexpected character \"{t.value[0]}\" in row {t.lineno}, column {column}")
-        t.lexer.skip(1)
-
-    # Actualizar la posición de la columna
-    def find_column(input, token):
-        last_cr = input.rfind('\n', 0, token.lexpos)
-        if last_cr < 0:
-            last_cr = -1
-        column = (token.lexpos - last_cr)
-        return column
-
-    # tokens ignorados
-
-    t_ignore = " \t"
-
-    # conteo de lineas 
+    # --------------------------------------------------------------------------
+    # Inicialización del Analizador Léxico (Lexer)
+    # --------------------------------------------------------------------------
+    # Obtiene el lexer configurado y la lista de errores léxicos desde el módulo lexer.py.
+    lexer, lexer_tokens, lexer_errors = get_lexer_and_tokens(input_data)
     
-    def t_newline( t ):
-        r"\n+"
-        t.lexer.lineno += len(t.value)
+    # Si se encontraron errores léxicos, reportarlos y salir.
+    if lexer_errors:
+        for error in lexer_errors:
+            print(error)
+        sys.exit(1)
 
+    # --------------------------------------------------------------------------
+    # Definición del Analizador Sintáctico (Parser) y la Construcción del AST
+    # --------------------------------------------------------------------------
 
-    # llamada al contructor lexico
-
-    lexer = Lex.lex()
-
-    # entrada de la data para los tokens
-
-    lexer.input(input_data)
-
-    #------------------------------------------------
-    # Etapa2
-    #------------------------------------------------
-
-
+    # Clases de Nodos del Árbol de Sintaxis Abstracta (AST).
+    # Cada clase representa un tipo de construcción sintáctica del lenguaje.
+    # Los nodos almacenan el operador de la construcción y sus hijos (sub-árboles).
 
     class Block():
-        def __init__(self,type = None, lefson = None, rightson = None, op = None):
-            self.type = type
-            self.lefson = lefson
-            self.rightson = rightson
-            self.op = op
+        """Representa un bloque de código."""
+        def __init__(self,op = None, leftson = None, rightson = None, value = None):
+            self.op = op          # Operador o tipo de nodo (ej: "Block")
+            self.leftson = leftson  # Hijo izquierdo del nodo
+            self.rightson = rightson # Hijo derecho del nodo
+            self.value = value
+        def __str__(self):
+            return f"{self.op}"
 
-    class Declare(Block): pass
-    class Secuencing(Block):pass
-    class Asig(Block): pass
-    class If(Block): pass
-    class Gruar(Block): pass
-    class While(Block): pass
-    class Literal(Block): pass
-    class Expr(Block): pass
+    class DeclareSection(): 
+        """Representa la sección de declaraciones dentro de un bloque."""
+        def __init__(self,op = None, children = None):
+            self.op = op          # Operador o tipo de nodo (ej: "Block")
+            self.children = children
+            
+        def imprimir_declares(self, nivel):
+            for son in self.children:
+                tupla = son.VariableAndType
+                for variale in tupla[1]:
+                    print("-" * nivel, f"variable: {variale} | type: {tupla[0]}", sep="")
 
+                    #print("-" * nivel, son, sep="")
 
-    class Binary_expressions(Expr):pass
-
-    # Se define la presedencia de los operadores
-    # Desde menor presedencia a mayor y agrupación a izquierda
-
-    precedence = (
-        ("left", "TkAnd", "TkOr"),
-        ("left", "TkNEqual", "TkEqual", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
-        ("left", "TkPlus", "TkMinus"),
-        ("left", "TkMult"),
-        ("right", "UMinus", "TkNot")  # menos unario
-    )
-
-    # Se define símbolo inicial
-    start = "Block"
-    # Se definen las reglas de la gramatica
-    
-    def p_empty(p):
-        "empty :"
+    class Sequencing(Block):
+        """Representa una secuencia de instrucciones o declaraciones."""
         pass
 
 
+    class SequencingDeclare(Block): 
+        """Representa una secuencia de declaraciones específicas."""
+        pass
+
+    class Declare(): 
+        """Representa una declaración individual (variable o función)."""
+        def __init__(self, op = None, VariableAndType = []):
+            self.op = op
+            self.VariableAndType = VariableAndType
+            #self.VariableAndType[VariableAndType[0]] = VariableAndType[1]
+        def __str__(self):
+            for variale in self.VariableAndType[1]:
+                return f"variable: {variale} | type: {self.VariableAndType[0]}"
+
+    class WriteFunction(Block): 
+        """Representa la escritura de valores a parámetros de una función."""
+        pass
+    class Asig(Block): 
+        """Representa una instrucción de asignación."""
+        pass
+    class If(Block): 
+        """Representa una sentencia condicional 'if' con guardias."""
+        pass
+    class While(Block): 
+        """Representa una sentencia de bucle 'while'."""
+        pass
+    class Literal(Block): 
+        """Representa un valor literal (número, true, false)."""
+        pass
+    class Expr(Block): 
+        """Clase base para expresiones."""
+        pass
+    class Binary_expressions(Block):
+        """Representa una operación binaria (ej: suma, resta, AND, OR)."""
+        pass
+    class Ident(Block): 
+        """Representa un identificador (nombre de variable o función)."""
+        pass
+    class String(Block):
+        """Representa un literal de cadena de texto."""
+        pass
+    class UExpresson(Block): 
+        """Representa una operación unaria (ej: negación, menos unario)."""
+        pass
+    class Print(Block): 
+        """Representa una instrucción de impresión."""
+        pass
+    class Skip(Block): 
+        """Representa una instrucción 'skip' (no-operación)."""
+        pass
+    class Guard(Block): 
+        """Representa una cláusula de guardia (condición --> instrucción) dentro de un 'if'."""
+        pass
+    class Then(Block): 
+        """Representa la parte 'then' de una cláusula de guardia o bucle while."""
+        pass
+    class TwoPoints(Block): 
+        """Representa la expresión 'expr1:expr2' para acceso a funciones."""
+        pass
+
+    SimbolTable = {}
+
+    # Definición de la precedencia de operadores.
+    # Las tuplas definen el nivel de precedencia (de menor a mayor) y la asociatividad.
+    precedence = (
+        ("left", "TkOr"),        # Or (menos precedencia)
+        ("left", "TkAnd"),       # And
+        ("left", "TkNEqual", "TkEqual"), # ==, <>
+        ("left", "TkLeq", "TkLess", "TkGreater", "TkGeq"), # <=, <, >, >=
+        ("left", "TkComma"),     # , (para listas de identificadores/expresiones)
+        ("left", "TkTwoPoints"), # : (para acceso a funciones tipo (expr1:expr2))
+        ("left", "TkPlus", "TkMinus"), # +, -
+        ("left", "TkMult"),      # * (mayor precedencia para operadores aritméticos)
+        ("right", "UMinus", "TkNot"), # !, - (unario, asociatividad derecha)
+        ("left", "TkApp")        # . (para aplicación de función o acceso a miembros)
+    )
+
+    # Define el símbolo inicial de la gramática (la regla de producción de más alto nivel).
+    start = "Block"
+
+    # --------------------------------------------------------------------------
+    # Reglas gramaticales para el parsing y construcción del AST
+    # --------------------------------------------------------------------------
+    # Cada función `p_` define una regla de producción.
+    # La docstring de la función (`"""Rule : Production"""`) es la definición de la regla.
+    # `p[0]` es el valor de la regla actual, `p[1]`, `p[2]`, etc., son los valores de los símbolos de su producción.
+
     def p_Block(p):
         """
-        Block : TkOBlock Secuencing TkCBlock
+        Block : TkOBlock DeclareSection Sequencing TkCBlock
         """
-        p[0] = ["Block", p[2]]
-    # permite recurción
-    def p_Block_DeclareSection(p):
-        """
-        Block : TkOBlock DeclareSection Secuencing TkCBlock
-        """
-        p[0] = ["Block", p[2], p[3]]
+        # Representa un bloque de código con sección de declaraciones y secuencia de instrucciones.
+        p[0] = Block("Block", p[2], p[3])
 
-    def p_Block_DeclareSection_only(p):
+    def p_block_only_sequencing(p):
         """
-        Block : TkOBlock DeclareSection TkCBlock
+        Block : TkOBlock Sequencing TkCBlock
         """
-        p[0] = ["Block", p[2]]
+        # Representa un bloque de código solo con secuencia de instrucciones (sin declaraciones).
+        p[0] = Block("Block", p[2]) # p[2] es la secuencia de instrucciones
 
-    def p_secuencing(p):
+    def p_sequencing(p):
         """
-        Secuencing : Secuencing TkSemicolon Instruction
+        Sequencing : Sequencing TkSemicolon Instruction
         """
-        p[0] = ["Secuencing", p[1], p[3]]
+        # Regla recursiva para una secuencia de instrucciones separadas por ';'.
+        p[0] = Sequencing("Sequencing", p[1], p[3])
 
-    def p_secuencing(p):
+    def p_sequencing_only(p):
         """
-        Secuencing : Instruction
+        Sequencing : Instruction
         """
-        p[0] = p[1]
+        # Caso base para una secuencia de una sola instrucción.
+        p[0] = p[1] # El valor de la secuencia es el valor de la instrucción.
 
     def p_instruction(p):
         """
@@ -249,230 +215,311 @@ def main():
                     | Skip
                     | Block
         """
+        # Define los tipos de instrucciones válidas en el lenguaje.
         p[0] = p[1]
 
     def p_declare_section(p):
         """
-        DeclareSection : SecuencingDeclare
+        DeclareSection : SequencingDeclare
         """
-        p[0] = ["Declare", p[1]]
+        # Define la sección de declaraciones, que es una secuencia de declaraciones.
+        p[0] = DeclareSection("Symbols Table", p[1])
 
-    def p_secuencing_declare_recursivo(p):
+    def p_sequencing_declare_recursivo(p):
         """
-        SecuencingDeclare : Declare TkSemicolon SecuencingDeclare
+        SequencingDeclare : SequencingDeclare Declare TkSemicolon
         """
-        p[0] = ["Secuencing", p[1], p[3]]
+        # Regla recursiva para una secuencia de declaraciones terminadas en ';'.
+        p[0] =  p[1] + [p[2]]
 
-    def p_secuencing_declare(p):
+    def p_sequencing_declare(p):
         """
-        SecuencingDeclare : Declare TkSemicolon
+        SequencingDeclare : Declare TkSemicolon
         """
-        p[0] = p[1]
+        # Caso base para una secuencia de una sola declaración terminada en ';'.
+        p[0] = [p[1]]
 
     def p_declare_int_bool(p):
         """
-        Declare : TkBool Ident
-                | TkInt Ident
+        Declare : TkBool TkId
+                | TkInt TkId
         """
-        p[0] = [p[2], p[1]]
-
-
+        # Regla para declarar una variable de tipo int o bool.
+        p[0] = Declare(None, [p[1], [p[2]]]) # Formato "id : tipo"
     def p_declare_function(p):
         """
-        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident
+        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId
         """
-        p[0] = ["WriteFunction", p[6], p[1], p[2], p[3], p[4], p[5]]
-    # permite recursión
+        # Regla para declarar una función con un literal como tamaño.
+        p[0] = Declare( None ,[ "function[.." + p[4].value + "]", [p[6]]]) # Formato "id : function[..literal]"
+
     def p_declare_int_bool_with_comma(p):
         """
-        Declare : TkBool Ident Comma
-                | TkInt Ident Comma
+        Declare : TkBool TkId Comma
+                | TkInt TkId Comma
         """
-        p[0] = [p[1], p[2]] + p[3]
-    # permite recursión
+        # Permite declarar múltiples variables del mismo tipo separadas por comas.
+        p[0] = Declare(None, [p[1], [p[2]] + p[3] ])
+
     def p_declare_function_with_comma(p):
         """
-        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket Ident Comma
+        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId Comma
         """
-        p[0] = ["WriteFunction", p[6]] + p[7] + [p[1], p[2], p[3], p[4], p[5]] 
+        # Permite declarar múltiples funciones separadas por comas.
+        p[0] = Declare( None, ["function[.." + p[4].value + "]" ,[p[6]] + p[7]])
+
     def p_comma(p):
         """
-        Comma : TkComma Ident
+        Comma : TkComma TkId
         """
-        p[0] = [p[1], p[2]]
-    # permite recursión
+        # Regla para el patrón de una coma seguida de un identificador.
+        p[0] = [p[2]]
+
     def p_comma_with_comma(p):
         """
-        Comma : TkComma Ident Comma
+        Comma : TkComma TkId Comma
         """
-        p[0] = [p[1], p[2], p[3]]
+        # Regla recursiva para múltiples identificadores separados por comas.
+        p[0] = [p[2]] +  p[3]
+
     def p_asig(p):
         """
         Asig : Ident TkAsig expression
-             | Ident TkAsig WriteFunction
         """
-        p[0] = [p[1], p[2], p[3]]
-    def p_writefunction(p):
-        """
-        WriteFunction : Ident acceso
-        """
-        p[0] = [p[1], p[2]]
-    def p_acceso_funcion(p):
-        """
-        acceso : TkOpenPar expression TwoPoints expression TkClosePar
-        """
-        p[0] = [p[1], p[2], p[3], p[4], p[5]]
-
-    def p_acceso_funcion_recursivo(p):
-        """
-        acceso : TkOpenPar expression TwoPoints expression TkClosePar acceso
-        """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+        # Regla para la instrucción de asignación.
+        p[0] = Asig("Asig", p[1], p[3])
 
     def p_if(p):
         """
-        If : TkIf expression Then Instruction Guard TkFi
+        If : TkIf Guard TkFi
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5], p[6]]
+        # Regla para la sentencia 'if' con una o más guardias.
+        p[0] = If("If", p[2])
+
+    def p_guard0(p):
+        """
+        Guard : Guard TkGuard Then
+        """
+        # Regla recursiva para guardias anidadas (ej: [] condición --> instrucciones).
+        p[0] = Guard("Guard", p[1], p[3])
+
+    def p_guard1(p):
+        """
+        Guard : Then
+        """
+        # Caso base para una guardia (la primera en un 'if').
+        p[0] = p[1] # El valor de la guardia es el valor del Then.
+
     def p_while(p):
         """
-        While : TkWhile expression Then Instruction TkEnd
+        While : TkWhile Then TkEnd
         """
-        p[0] = [p[1], p[2], p[3], p[4], p[5]]
-    def p_guard(p):
+        # Regla para el bucle 'while'.
+        p[0] = While("While", p[2])
+
+    def p_then(p):
         """
-        Guard : TkGuard expression Then Instruction
+        Then : expression TkArrow Sequencing
         """
-        p[0] = [p[1], p[2], p[3], p[4]]
-    def p_guard_empty(p):
-        """
-        Guard : empty
-        """
-        p[0] = p[1]
+        # Regla para la cláusula 'then' de una guardia o un bucle 'while'.
+        # Contiene una expresión de condición y una secuencia de instrucciones.
+        p[0] = Then("Then",p[1], p[3])
 
     def p_skip(p):
         """
         Skip : TkSkip
         """
-        p[0] = p[1]
+        # Regla para la instrucción 'skip'.
+        p[0] = Skip("skip")
 
     def p_print(p):
         """
         Print : TkPrint expression
         """
-        p[0] = [p[0], p[2]]
+        # Regla para la instrucción 'print'.
+        p[0] = Print("Print", p[2])
 
-    # estudiar la forma como se expresa esta gramática
+    # Reglas para expresiones binarias (aritméticas, lógicas, de comparación, aplicación, acceso).
+    # La precedencia y asociatividad se manejan con la tabla `precedence` y las reglas `terminoX`.
     def p_binary_expressions(p):
         """
-        expression : expression Plus termino
-                   | expression Minus termino
-                   | expression Equal termino 
-                   | expression NEqual termino
-                   | expression Leq termino
-                   | expression Less termino
-                   | expression Geq termino
-                   | expression Greater termino
-                   | expression And termino
-                   | expression Or termino
-                   | expression TkApp termino
-        termino : termino Mult factor
+        expression : expression TkOr termino0
+        termino0 : termino0 TkAnd termino1
+        termino1 : termino1 TkEqual termino12
+                 | termino1 TkNEqual termino12
+                 | termino1 TkLeq termino12
+                 | termino1 TkLess termino12
+                 | termino1 TkGeq termino12
+                 | termino1 TkGreater termino12
+        termino12 : termino12 TkComma termino2
+                  | termino12 TkTwoPoints termino2
+        termino2 : termino2 TkPlus termino3
+                 | termino2 TkMinus termino3 
+        termino3 : termino3 TkMult factor
+        factor : factor TkApp factor
         """
-        p[0] = [p[2], p[1], p[3]]
-        
+        # Se mapea el token del operador a su nombre en el AST.
+        if p[2] == "+":
+            p[0] = Binary_expressions("Plus", p[1], p[3])
+        elif p[2] == "-":
+            p[0] = Binary_expressions("Minus", p[1], p[3])
+        elif p[2] == "and":
+            p[0] = Binary_expressions("And", p[1], p[3])
+        elif p[2] == ".":
+            p[0] = Binary_expressions("App", p[1], p[3])
+        elif p[2] == "*":
+            p[0] = Binary_expressions("Mult", p[1], p[3])
+        elif p[2] == "or":
+            p[0] = Binary_expressions("Or", p[1], p[3])
+        elif p[2] == "==":
+            p[0] = Binary_expressions("Equal", p[1], p[3])
+        elif p[2] == "<>":
+            p[0] = Binary_expressions("NotEqual", p[1], p[3])
+        elif p[2] == "<=":
+            p[0] = Binary_expressions("Leq", p[1], p[3])
+        elif p[2] == "<":
+            p[0] = Binary_expressions("Less", p[1], p[3])
+        elif p[2] == ">=":
+            p[0] = Binary_expressions("Geq", p[1], p[3])
+        elif p[2] == ">":
+            p[0] = Binary_expressions("Greater", p[1],p[3])
+        elif p[2] == ",":
+            p[0] = Binary_expressions("Comma", p[1], p[3])
+        elif p[2] == ":":
+            p[0] = Binary_expressions("TwoPoints", p[1], p[3])
+
     def p_unary_expression(p):
         """
-        factor : Not factor
-                | Minus factor %prec UMinus
+        factor : TkNot factor
+               | TkMinus factor %prec UMinus
         """
-        p[0] = [p[1], p[2]]
+        # Reglas para expresiones unarias (negación lógica o menos unario).
+        # `%prec UMinus` especifica la precedencia para el menos unario.
+        if p[1] == "!":
+            p[0] = UExpresson("Not", p[2])
+        elif p[1] =="-":
+            p[0] = UExpresson("Minus", p[2])
+            
     def p_factor(p):
         """
         factor : TkOpenPar expression TkClosePar
         """
-        p[0] = [p[1], p[2], p[3]]
+        # Agrupación de expresiones con paréntesis.
+        p[0] = p[2] # El valor del factor es la expresión dentro de los paréntesis.
 
-
+    def p_factor_writefunction(p):
+        """
+        factor : factor TkOpenPar expression TkClosePar
+        """
+        # Maneja la escritura de valores a parámetros de función (ej: `f(x)`).
+        # Se interpreta como una operación de "WriteFunction" con el nombre de la función y la expresión de acceso.
+        p[0] = Binary_expressions("WriteFunction", p[1], p[3])
 
     def p_subtitutions(p):
         """
-        expression : termino
-        termino : factor
+        expression : termino0
+        termino0 : termino1
+        termino1 : termino12
+        termino12 : termino2
+        termino2 : termino3
+        termino3 : termino4
+        termino4 : factor
         factor : Literal
                | Ident
                | String
-        And : TkAnd
-        Or : TkOr
-        Mult : TkMult
-        NEqual : TkNEqual
-        Equal : TkEqual
-        Leq : TkLeq
-        Less : TkLess
-        Geq : TkGeq
-        Greater : TkGreater
-        Plus : TkPlus
-        Minus : TkMinus
+        """
+        # Reglas de "sustitución" que permiten que una expresión de menor precedencia
+        # sea tratada como una de mayor precedencia en el árbol de análisis.
+        # Básicamente, pasan el valor del lado derecho al izquierdo.
+        p[0] = p[1]
+
+    def p_ident(p):
+        """
+        Ident : TkId
+        """
+        # Regla para los identificadores.
+        p[0] = Ident("Ident: " + p[1]) # Almacena el identificador con un prefijo.
+
+    def p_string(p):
+        """
+        String : TkString
+        """
+        # Regla para los literales de cadena.
+        p[0] = String("String: "+f"\"{p[1]}\"") # Almacena la cadena con un prefijo y comillas.
+
+    # Manejo de errores sintácticos.
+    def p_literal(p):
+        """
         Literal : TkNum
                 | TkTrue
                 | TkFalse
-        Ident : TkId
-        String : TkString
-        TwoPoints : TkTowPoints
-        Then : TkArrow
-        Not : TkNot
         """
-        p[0] = p[1]
-
-    # manejo de errores sintaticos
+        # Regla para los literales numéricos y booleanos.
+        p[0] = Literal("Literal: " + str(p[1]), value=str(p[1])) # Almacena el literal con un prefijo.
 
     def p_error(p):
-        print("Sintax error")
+        """
+        Función de manejo de errores sintácticos.
+        Se llama automáticamente por PLY cuando se encuentra un error de sintaxis.
+        """
+        if p:
+            # Si hay un token en el punto del error, intenta dar información de línea y columna.
+            column = p.lexpos - p.lexer.lexdata.rfind('\n', 0, p.lexpos)
+            if column <= 0: # Ajustar para casos donde el token está al inicio de línea
+                column = p.lexpos + 1
+            print(f"Sintax error in row {p.lineno}, column {column}: unexpected token '{p.value}'")
+        else:
+            # Si el error es al final del archivo (EOF - End Of File)
+            print("Syntax error at EOF")
+        sys.exit(1) # Sale del programa indicando un error.
 
-
-    # constructor del parser
+    # Construir el analizador sintáctico (parser).
+    # Se inicializa el parser de PLY con las reglas de gramática y la tabla de precedencia.
     parser = Yacc.yacc()
 
-    prueba = """
-                {
-                    int b;
-                }
-                """
-    result = parser.parse(prueba)
-    
-    n = 0
-    
-    print(result)
-    print("-"*n+f"{result[0]}")
-    n += 1
-    print("-"*n+f"{result[1][0]}")
-    n += 1
-    
+    # Realiza el análisis sintáctico del contenido del archivo de entrada.
+    result = parser.parse(input_data, lexer=lexer) # Pasa el lexer explícitamente al parser.
+
+    # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
+    if result:
+        imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+    else:
+        print("Parsing completado, pero no se generó AST (posiblemente por entrada vacía o errores de sintaxis).")
 
 
-    #print(current.rightson)
-    #imprimir_ast(result, 0)
-    
+# --------------------------------------------------------------------------
+# Funciones Auxiliares
+# --------------------------------------------------------------------------
 
-
-    
 def imprimir_ast(arbol, n):
+    """
+    Función recursiva para imprimir el Árbol de Sintaxis Abstracta (AST).
+    Recorre el árbol en preorden, imprimiendo el operador de cada nodo
+    con una indentación que representa su nivel en el árbol.
 
+    Args:
+        arbol (Node): El nodo actual del AST a imprimir.
+        n (int): El nivel de indentación actual.
+    """
     current = arbol
-    space = n
-    operation = None
+    nivel = n
 
     if current != None:
-        print("-"*space+f"{current.type}")
-        rightson = current.rightson
-        leftson = current.leftson
-    
-        imprimir_ast(rightson, n+1)
-        imprimir_ast(leftson, n+1)
+        # Imprime el operador del nodo actual, con 'nivel' guiones para indentación.
+        print("-" * nivel + f"{current.op}")
+
+        if current.op == "Symbols Table":
+            current.imprimir_declares(nivel+1)
+        
+        else:    
+            # Llama recursivamente para el hijo izquierdo, aumentando el nivel de indentación.
+            imprimir_ast(current.leftson, nivel + 1)
+            
+            # Llama recursivamente para el hijo derecho, aumentando el nivel de indentación.
+            imprimir_ast(current.rightson, nivel + 1)
 
 
-
-
-
-
+# Punto de entrada principal del script.
+# Asegura que `main()` se ejecute solo cuando el script es ejecutado directamente.
 if __name__ == "__main__":
     main()
