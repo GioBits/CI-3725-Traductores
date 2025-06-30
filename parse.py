@@ -217,6 +217,16 @@ def main():
     # Cada función `p_` define una regla de producción.
     # La docstring de la función (`"""Rule : Production"""`) es la definición de la regla.
     # `p[0]` es el valor de la regla actual, `p[1]`, `p[2]`, etc., son los valores de los símbolos de su producción.
+    
+
+    def p_block_only_sequencing(p):
+        """
+        Block : TkOBlock Sequencing TkCBlock
+        """
+        # Representa un bloque de código solo con secuencia de instrucciones (sin declaraciones).
+        # Creamos un DeclareSection vacío para que siempre se imprima "Symbols Table"
+        empty_declare_section = DeclareSection("Symbols Table", [])
+        p[0] = Block("Block", empty_declare_section, p[2])  # p[2] es la secuencia de instrucciones
 
     def p_Block(p):
         """
@@ -224,13 +234,6 @@ def main():
         """
         # Representa un bloque de código con sección de declaraciones y secuencia de instrucciones.
         p[0] = Block("Block", p[2], p[3])
-
-    def p_block_only_sequencing(p):
-        """
-        Block : TkOBlock Sequencing TkCBlock
-        """
-        # Representa un bloque de código solo con secuencia de instrucciones (sin declaraciones).
-        p[0] = Block("Block", p[2]) # p[2] es la secuencia de instrucciones
 
     def p_sequencing(p):
         """
