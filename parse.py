@@ -420,7 +420,7 @@ def main():
             else:
                 p[0] = Binary_expressions("Concat", p[1], p[3], "String")
         elif p[2] == "-":
-            p[0] = Binary_expressions("Minus | type: int", p[1], p[3], "int")
+            p[0] = Binary_expressions("Minus", p[1], p[3], "int")
         elif p[2] == "and":
             p[0] = Binary_expressions("And", p[1], p[3], "bool")
         elif p[2] == ".":
