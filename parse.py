@@ -301,7 +301,7 @@ def main():
 
         SimbolTable[p[6]] = "function[.." + p[4].value + "]"
         for variable in p[7]:
-            SimbolTable[varialbe] = "function[.." + p[4].value + "]"
+            SimbolTable[variable] = "function[.." + p[4].value + "]"
     def p_comma(p):
         """
         Comma : TkComma TkId
