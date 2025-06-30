@@ -97,9 +97,15 @@ class Ident():
         self.type = type
     def __str__(self):
         return f"Ident: {self.value} | type: {self.type}"
-class String(Block):
+
+class String():
     """Representa un literal de cadena de texto."""
-    pass
+    def __init__(self,op = None, value = None, type = None):
+        self.op = op  
+        self.value = value        # Operador o tipo de nodo (ej: "Block")
+        self.type = type
+    def __str__(self):
+        return f"{self.op}"
 class UExpresson(Block): 
     """Representa una operación unaria (ej: negación, menos unario)."""
     def __init__(self,op = None, leftson = None, rightson = None, type = None, number = None):
@@ -406,7 +412,10 @@ def main():
         """
         # Se mapea el token del operador a su nombre en el AST.
         if p[2] == "+":
-            p[0] = Binary_expressions("Plus", p[1], p[3], "int")
+            if p[1].type == "int" and p[3].type == "int":
+                p[0] = Binary_expressions("Plus", p[1], p[3], "int")
+            else:
+                p[0] = Binary_expressions("Concat", p[1], p[3], "String")
         elif p[2] == "-":
             p[0] = Binary_expressions("Minus | type: int", p[1], p[3], "int")
         elif p[2] == "and":
@@ -430,7 +439,10 @@ def main():
         elif p[2] == ">":
             p[0] = Binary_expressions("Greater", p[1],p[3], "bool")
         elif p[2] == ",":
-            p[0] = Binary_expressions("Comma", p[1], p[3], f"function with lenght=2") # tener cuidado con el largo de las comas
+            if p[1].op =="Comma":
+                p[0] = Binary_expressions("Comma", p[1], p[3], f"function with length={p[1].number+1}", p[1].number+1) # tener cuidado con el largo de las comas
+            else:
+                p[0] = Binary_expressions("Comma", p[1], p[3], f"function with length={2}", 2)  
         elif p[2] == ":":
             p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
@@ -491,7 +503,7 @@ def main():
         String : TkString
         """
         # Regla para los literales de cadena.
-        p[0] = String("String: "+f"\"{p[1]}\"") # Almacena la cadena con un prefijo y comillas.
+        p[0] = String("String: "+f"\"{p[1]}\"", type = "String") # Almacena la cadena con un prefijo y comillas.
 
     # Manejo de errores sintácticos.
     def p_literal_num(p):
@@ -583,6 +595,8 @@ def imprimir_ast(arbol, n):
         elif isinstance(current, Literal):
             print("-" * nivel,current, sep="")
         elif isinstance(current, Ident):
+            print("-" * nivel,current, sep="")
+        elif isinstance(current, String):
             print("-" * nivel,current, sep="")
         else:
             print("-" * nivel + f"{current.op}")    
