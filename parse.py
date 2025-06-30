@@ -400,7 +400,7 @@ def main():
         elif p[2] == "and":
             p[0] = Binary_expressions("And", p[1], p[3], "bool")
         elif p[2] == ".":
-            p[0] = Binary_expressions("App", p[1], p[3], "int")
+            p[0] = Binary_expressions("ReadFunction", p[1], p[3], "int")
         elif p[2] == "*":
             p[0] = Binary_expressions("Mult", p[1], p[3], "int")
         elif p[2] == "or":
