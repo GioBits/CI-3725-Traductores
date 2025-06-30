@@ -77,11 +77,12 @@ class Expr(Block):
     pass
 class Binary_expressions():
     """Representa una operación binaria (ej: suma, resta, AND, OR)."""
-    def __init__(self,op = None, leftson = None, rightson = None, type = None):
+    def __init__(self,op = None, leftson = None, rightson = None, type = None, number = None):
         self.op = op          # Operador o tipo de nodo (ej: "Block")
         self.leftson = leftson  # Hijo izquierdo del nodo
         self.rightson = rightson # Hijo derecho del nodo
         self.type = type
+        self.number = number
     def __str__(self):
         if self.type != None:
             return f"{self.op} | type: {self.type}"
@@ -101,7 +102,18 @@ class String(Block):
     pass
 class UExpresson(Block): 
     """Representa una operación unaria (ej: negación, menos unario)."""
-    pass
+    def __init__(self,op = None, leftson = None, rightson = None, type = None, number = None):
+        self.op = op          # Operador o tipo de nodo (ej: "Block")
+        self.leftson = leftson  # Hijo izquierdo del nodo
+        self.rightson = rightson # Hijo derecho del nodo
+        self.type = type
+        self.number = number
+    def __str__(self):
+        if self.type != None:
+            return f"{self.op} | type: {self.type}"
+        else:
+            return f"{self.op}"
+            
 class Print(Block): 
     """Representa una instrucción de impresión."""
     pass
@@ -418,7 +430,7 @@ def main():
         elif p[2] == ">":
             p[0] = Binary_expressions("Greater", p[1],p[3], "bool")
         elif p[2] == ",":
-            p[0] = Binary_expressions("Comma", p[1], p[3], "function with lenght=2") # tener cuidado con el largo de las comas
+            p[0] = Binary_expressions("Comma", p[1], p[3], f"function with lenght=2") # tener cuidado con el largo de las comas
         elif p[2] == ":":
             p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
@@ -430,9 +442,9 @@ def main():
         # Reglas para expresiones unarias (negación lógica o menos unario).
         # `%prec UMinus` especifica la precedencia para el menos unario.
         if p[1] == "!":
-            p[0] = UExpresson("Not", p[2])
+            p[0] = UExpresson("Not", p[2], type = "bool")
         elif p[1] =="-":
-            p[0] = UExpresson("Minus", p[2])
+            p[0] = UExpresson("Minus", p[2], type = "int")
             
     def p_factor(p):
         """
@@ -551,6 +563,14 @@ def imprimir_ast(arbol, n):
         if isinstance(current, DeclareSection):
             print("-" * nivel + f"{current.op}")
             current.imprimir_declares(nivel+1)
+
+        elif isinstance(current, UExpresson):
+            print("-" * nivel,current, sep="")
+            # Llama recursivamente para el hijo izquierdo, aumentando el nivel de indentación.
+            imprimir_ast(current.leftson, nivel + 1)
+            
+            # Llama recursivamente para el hijo derecho, aumentando el nivel de indentación.
+            imprimir_ast(current.rightson, nivel + 1)            
 
         elif isinstance(current, Binary_expressions):
             print("-" * nivel,current, sep="")
