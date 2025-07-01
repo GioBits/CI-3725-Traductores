@@ -352,7 +352,7 @@ def main():
         else:
             # Obtener la posición del token de asignación (:=) que es más confiable
             line = p.lineno(2)
-            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -2
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-(len(p[1].value)) 
             if column <= 0: # Ajuste para tokens al inicio de línea
                 column = p.lexpos(2) + 1
             
