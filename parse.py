@@ -347,17 +347,17 @@ def main():
         """
         Asig : Ident TkAsig expression
         """
-        # Regla para la instrucción de asignación.
         if p[1].type == p[3].type or (p[1].type == "function[..0]" and p[3].type== "int"):
             p[0] = Asig("Asig", p[1], p[3])
         else:
-            line = p.lineno(1)
-            column = p.lexpos(1) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(1))
+            # Obtener la posición del token de asignación (:=) que es más confiable
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -2
             if column <= 0: # Ajuste para tokens al inicio de línea
-                column = p.lexpos(1) + 1
+                column = p.lexpos(2) + 1
+            
             error_msg = f"Type error. Variable {p[1].value} has different type than expression at line {line} and column {column}"
             errores.append(error_msg)
-
             p[0] = Asig("Asig", p[1], p[3])
 
     def p_if(p):
@@ -488,9 +488,22 @@ def main():
         """
         factor : factor TkOpenPar expression TkClosePar
         """
-        # Maneja la escritura de valores a parámetros de función (ej: `f(x)`).
-        # Se interpreta como una operación de "WriteFunction" con el nombre de la función y la expresión de acceso.
-        p[0] = Binary_expressions("WriteFunction", p[1], p[3], p[1].type)
+        if p[1].type and p[1].type.startswith("function"):
+            p[0] = Binary_expressions("WriteFunction", p[1], p[3], p[1].type)
+        else:
+            # Calcular línea y columna correctamente
+            line = p.lineno(2)  # línea del '('
+            lexdata = p.lexer.lexdata
+            last_newline = lexdata.rfind('\n', 0, p.lexpos(2))
+            column = (p.lexpos(2) - last_newline) if last_newline >= 0 else (p.lexpos(2) + 1)
+            
+            # Extraer la línea completa para verificación
+            next_newline = lexdata.find('\n', p.lexpos(2))
+            current_line = lexdata[last_newline+1:next_newline] if next_newline >=0 else lexdata[last_newline+1:]
+            
+            error_msg = f"The function modification operator is use in not function variable at line {line} and column {column-1}"
+            errores.append(error_msg)
+            p[0] = Binary_expressions("WriteFunction", p[1], p[3], p[1].type)
 
     def p_subtitutions(p):
         """
