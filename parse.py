@@ -349,6 +349,17 @@ def main():
         """
         if p[1].type == p[3].type or (p[1].type == "function[..0]" and p[3].type== "int"):
             p[0] = Asig("Asig", p[1], p[3])
+        elif p[1].type != None and p[3].type != None and p[1].type[0:2] == p[3].type[0:2] and p[1].type[11] != p[3].type[11]:
+            # Obtener la posición del token de asignación (:=) que es más confiable
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) +1
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(2) + 1
+            
+            error_msg = f"It is expected a list of length {int(p[1].type[11])+1} at line {line} and column {column}"
+            errores.append(error_msg)
+            p[0] = Asig("Asig", p[1], p[3])
+
         else:
             # Obtener la posición del token de asignación (:=) que es más confiable
             line = p.lineno(2)
