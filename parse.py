@@ -190,8 +190,11 @@ def main():
     # Los nodos almacenan el operador de la construcción y sus hijos (sub-árboles).
 
 
-
+    # Tabla de simbolos
     SimbolTable = {}
+
+    # reportes de errores
+    errores = []
 
     # Definición de la precedencia de operadores.
     # Las tuplas definen el nivel de precedencia (de menor a mayor) y la asociatividad.
@@ -289,7 +292,7 @@ def main():
         """
         # Regla para declarar una variable de tipo int o bool.
         p[0] = Declare(None, [p[1], [p[2]]]) # Formato "id : tipo"
-
+        
         SimbolTable[p[2]] = p[1]
 
     def p_declare_function(p):
@@ -499,7 +502,17 @@ def main():
         Ident : TkId
         """
         # Regla para los identificadores.
-        p[0] = Ident(value = p[1], type=SimbolTable[p[1]]) # Almacena el identificador con un prefijo.
+        if p[1] not in SimbolTable:
+            line = p.lineno(1)
+            column = p.lexpos(1) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(1))
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(1) + 1
+            error_msg = f"Variable not declared at line {line} and column {column}"
+            errores.append(error_msg)
+            #print(error_msg)
+            p[0] = Ident(value = p[1], type=None)
+        else:
+            p[0] = Ident(value = p[1], type=SimbolTable[p[1]]) # Almacena el identificador con un prefijo.
 
     def p_string(p):
         """
@@ -549,7 +562,10 @@ def main():
 
     # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
     if result:
-        imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+        if not errores:
+            imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+        else:
+            print(errores[0])
     else:
         print("Parsing completado, pero no se generó AST (posiblemente por entrada vacía o errores de sintaxis).")
 
