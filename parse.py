@@ -85,7 +85,10 @@ class Binary_expressions():
         self.number = number
     def __str__(self):
         if self.type != None:
-            return f"{self.op} | type: {self.type}"
+            if self.op != "Comma":
+                return f"{self.op} | type: {self.type}"
+            else:
+                return f"{self.op} | type: function with length={self.number}"
         else:
             return f"{self.op}"
 
@@ -345,7 +348,17 @@ def main():
         Asig : Ident TkAsig expression
         """
         # Regla para la instrucción de asignación.
-        p[0] = Asig("Asig", p[1], p[3])
+        if p[1].type == p[3].type or (p[1].type == "function[..0]" and p[3].type== "int"):
+            p[0] = Asig("Asig", p[1], p[3])
+        else:
+            line = p.lineno(1)
+            column = p.lexpos(1) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(1))
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(1) + 1
+            error_msg = f"Type error. Variable {p[1].value} has different type than expression at line {line} and column {column}"
+            errores.append(error_msg)
+
+            p[0] = Asig("Asig", p[1], p[3])
 
     def p_if(p):
         """
@@ -446,9 +459,9 @@ def main():
             p[0] = Binary_expressions("Greater", p[1],p[3], "bool")
         elif p[2] == ",":
             if p[1].op =="Comma":
-                p[0] = Binary_expressions("Comma", p[1], p[3], f"function with length={p[1].number+1}", p[1].number+1) # tener cuidado con el largo de las comas
+                p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{p[1].number}]", p[1].number+1) # tener cuidado con el largo de las comas
             else:
-                p[0] = Binary_expressions("Comma", p[1], p[3], f"function with length={2}", 2)  
+                p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{1}]", 2)  
         elif p[2] == ":":
             p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
