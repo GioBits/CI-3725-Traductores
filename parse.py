@@ -109,7 +109,7 @@ class String():
         self.type = type
     def __str__(self):
         return f"{self.op}"
-class UExpresson(Block): 
+class UExpresson(): 
     """Representa una operación unaria (ej: negación, menos unario)."""
     def __init__(self,op = None, leftson = None, rightson = None, type = None, number = None):
         self.op = op          # Operador o tipo de nodo (ej: "Block")
@@ -300,12 +300,27 @@ def main():
 
     def p_declare_function(p):
         """
-        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId
+        Declare : TkFunction TkOBracket TkSoForth factor TkCBracket TkId
         """
         # Regla para declarar una función con un literal como tamaño.
-        p[0] = Declare( None ,[ "function[.." + p[4].value + "]", [p[6]]]) # Formato "id : function[..literal]"
+        if isinstance(p[4], UExpresson):
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) +1
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(2) + 1
+            error_msg = f"Error: lower bound of the interval greater than the upper bound at line {line} and column {column}"
+            errores.append(error_msg)
 
-        SimbolTable[p[6]] = "function[.." + p[4].value + "]"
+
+            p[0] = Declare( None ,[ "function[.." + p[4].leftson.value + "]", [p[6]]]) # Formato "id : function[..literal]"
+
+            SimbolTable[p[6]] = "function[.." + p[4].leftson.value + "]"
+
+
+        else:
+            p[0] = Declare( None ,[ "function[.." + p[4].value + "]", [p[6]]]) # Formato "id : function[..literal]"
+
+            SimbolTable[p[6]] = "function[.." + p[4].value + "]"
 
     def p_declare_int_bool_with_comma(p):
         """
@@ -321,14 +336,31 @@ def main():
 
     def p_declare_function_with_comma(p):
         """
-        Declare : TkFunction TkOBracket TkSoForth Literal TkCBracket TkId Comma
+        Declare : TkFunction TkOBracket TkSoForth factor TkCBracket TkId Comma
         """
         # Permite declarar múltiples funciones separadas por comas.
-        p[0] = Declare( None, ["function[.." + p[4].value + "]" ,[p[6]] + p[7]])
+        
+        if isinstance(p[4], UExpresson):
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) +1
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(2) + 1
+            error_msg = f"Error: lower bound of the interval greater than the upper bound at line {line} and column {column}"
+            errores.append(error_msg)
 
-        SimbolTable[p[6]] = "function[.." + p[4].value + "]"
-        for variable in p[7]:
-            SimbolTable[variable] = "function[.." + p[4].value + "]"
+
+            p[0] = Declare( None, ["function[.." + p[4].leftson.value + "]" ,[p[6]] + p[7]])
+
+            SimbolTable[p[6]] = "function[.." + p[4].leftson.value + "]"
+            for variable in p[7]:
+                SimbolTable[variable] = "function[.." + p[4].leftson.value + "]"
+
+        else:
+            p[0] = Declare( None, ["function[.." + p[4].value + "]" ,[p[6]] + p[7]])
+
+            SimbolTable[p[6]] = "function[.." + p[4].value + "]"
+            for variable in p[7]:
+                SimbolTable[variable] = "function[.." + p[4].value + "]"
     def p_comma(p):
         """
         Comma : TkComma TkId
@@ -415,7 +447,20 @@ def main():
         """
         # Regla para la cláusula 'then' de una guardia o un bucle 'while'.
         # Contiene una expresión de condición y una secuencia de instrucciones.
-        p[0] = Then("Then",p[1], p[3])
+        if p[1].type == "bool":
+            p[0] = Then("Then",p[1], p[3])
+        else:
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2))
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(2) + 1
+
+
+            error_msg = f"No boolean guard at line {line} and column {column}"
+            errores.append(error_msg)
+            p[0] = Then("Then",p[1], p[3])
+
+
 
     def p_skip(p):
         """
