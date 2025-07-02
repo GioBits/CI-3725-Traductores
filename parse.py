@@ -360,6 +360,16 @@ def main():
             errores.append(error_msg)
             p[0] = Asig("Asig", p[1], p[3])
 
+        elif p[1].type != p[3].type and p[3].op != None and p[3].type != None and p[3].type.startswith("function") and p[3].op.startswith("WriteFunction"):
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-(len(p[1].value)) 
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(2) + 1
+            
+            error_msg = f"Variable {p[1].value} is expected to be a function at line {line} and column {column}"
+            errores.append(error_msg)
+            p[0] = Asig("Asig", p[1], p[3])
+
         else:
             # Obtener la posición del token de asignación (:=) que es más confiable
             line = p.lineno(2)
@@ -444,10 +454,21 @@ def main():
         if p[2] == "+":
             if p[1].type == "int" and p[3].type == "int":
                 p[0] = Binary_expressions("Plus", p[1], p[3], "int")
-            else:
+            elif p[1].type == "String" and p[3].type == "String":
                 p[0] = Binary_expressions("Concat", p[1], p[3], "String")
+            else:
+                # Hay que colocar lo del erorr
+                # pero no puedo hacerlo hasta resolver
+                # lo de atributos en bloques internos
+                p[0] = Binary_expressions("Concat", p[1], p[3], "String")             
         elif p[2] == "-":
-            p[0] = Binary_expressions("Minus", p[1], p[3], "int")
+            if p[1].type == "int" and p[3].type == "int":
+                p[0] = Binary_expressions("Minus", p[1], p[3], "int")
+            else:
+
+
+
+                p[0] = Binary_expressions("Minus", p[1], p[3], "int")
         elif p[2] == "and":
             p[0] = Binary_expressions("And", p[1], p[3], "bool")
         elif p[2] == ".":
@@ -473,8 +494,29 @@ def main():
                 p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{p[1].number}]", p[1].number+1) # tener cuidado con el largo de las comas
             else:
                 p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{1}]", 2)  
+
+
         elif p[2] == ":":
-            p[0] = Binary_expressions("TwoPoints", p[1], p[3])
+            if p[1].type == "int" and p[3].type == "int":
+                p[0] = Binary_expressions("TwoPoints", p[1], p[3])
+
+            elif p[1].type == "int" and p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) +1
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Expected expression of type int at line {line} and column {column}"
+                errores.append(error_msg)
+                p[0] = Binary_expressions("TwoPoints", p[1], p[3])
+
+            elif p[1].type != "int" and p[3].type == "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -len(p[1].value)
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Expected expression of type int at line {line} and column {column}"
+                errores.append(error_msg)
+                p[0] = Binary_expressions("TwoPoints", p[1], p[3])
 
     def p_unary_expression(p):
         """
@@ -484,9 +526,30 @@ def main():
         # Reglas para expresiones unarias (negación lógica o menos unario).
         # `%prec UMinus` especifica la precedencia para el menos unario.
         if p[1] == "!":
-            p[0] = UExpresson("Not", p[2], type = "bool")
+            if p[2].type == "bool":
+                p[0] = UExpresson("Not", p[2], type = "bool")
+            else:
+                line = p.lineno(1)
+                column = p.lexpos(1) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(1))
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(1) + 1
+                error_msg = f"Type error in line {line} and column {column}"
+                errores.append(error_msg)
+                p[0] = UExpresson("Not", p[2], type = "bool")
+
         elif p[1] =="-":
-            p[0] = UExpresson("Minus", p[2], type = "int")
+            if p[2].type == "int":
+                p[0] = UExpresson("Minus", p[2], type = "int")
+            else:
+                line = p.lineno(1)
+                column = p.lexpos(1) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(1))
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(1) + 1
+                error_msg = f"Type error in line {line} and column {column}"
+                errores.append(error_msg)
+
+                p[0] = UExpresson("Minus", p[2], type = "int")
+
             
     def p_factor(p):
         """
