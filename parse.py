@@ -536,8 +536,22 @@ def main():
             p[0] = Binary_expressions("Greater", p[1],p[3], "bool")
         elif p[2] == ",":
             if p[1].op =="Comma":
+                if p[3].type != "int":
+                    line = p.lineno(2)
+                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2))
+                    if column <= 0: # Ajuste para tokens al inicio de línea
+                        column = p.lexpos(2) + 1
+                    error_msg = f"There is no integer list at line {line} and column {column}"
+                    errores.append(error_msg)
                 p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{p[1].number}]", p[1].number+1) # tener cuidado con el largo de las comas
             else:
+                if p[3].type != "int" or p[1].type != "int":
+                    line = p.lineno(2)
+                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2))
+                    if column <= 0: # Ajuste para tokens al inicio de línea
+                        column = p.lexpos(2) + 1
+                    error_msg = f"There is no integer list at line {line} and column {column}"
+                    errores.append(error_msg)
                 p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{1}]", 2)  
 
 
