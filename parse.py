@@ -294,6 +294,9 @@ def main():
                 | TkInt TkId
         """
         # Regla para declarar una variable de tipo int o bool.
+
+        
+        
         p[0] = Declare(None, [p[1], [p[2]]]) # Formato "id : tipo"
         
         SimbolTable[p[2]] = p[1]
@@ -379,6 +382,17 @@ def main():
         """
         Asig : Ident TkAsig expression
         """
+        if p[1].value not in SimbolTable:
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-len(p[1].value)
+            if column <= 0: # Ajuste para tokens al inicio de línea
+                column = p.lexpos(2) + 1 -len(p[1].value)
+            error_msg = f"Variable {p[1].value} not declared at line {line} and column {column}"
+            if errores:
+                errores[0] = error_msg
+            else:
+                errores.append(error_msg)
+
         if p[1].type == p[3].type or (p[1].type == "function[..0]" and p[3].type== "int"):
             p[0] = Asig("Asig", p[1], p[3])
         elif p[1].type != None and p[3].type != None and p[1].type[0:2] == p[3].type[0:2] and p[1].type[11] != p[3].type[11]:
@@ -507,32 +521,114 @@ def main():
                 # lo de atributos en bloques internos
                 p[0] = Binary_expressions("Concat", p[1], p[3], "String")             
         elif p[2] == "-":
-            if p[1].type == "int" and p[3].type == "int":
-                p[0] = Binary_expressions("Minus", p[1], p[3], "int")
-            else:
-
-
-
-                p[0] = Binary_expressions("Minus", p[1], p[3], "int")
+            if p[1].type != "int" or p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
+            p[0] = Binary_expressions("Minus", p[1], p[3], "int")
         elif p[2] == "and":
+
+            if p[1].type != "bool" or p[3].type != "bool":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
+
+
             p[0] = Binary_expressions("And", p[1], p[3], "bool")
         elif p[2] == ".":
+            if isinstance(p[1], Ident):
+                if p[1].type != None and not p[1].type.startswith("function"):
+                    line = p.lineno(2)
+                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1
+                    if column <= 0: # Ajuste para tokens al inicio de línea
+                        column = p.lexpos(2) + 1
+                    error_msg = f"Error. {p[1].value} is not indexable at line {line} and column {column}"
+                    errores.append(error_msg)
+
             p[0] = Binary_expressions("ReadFunction", p[1], p[3], "int")
         elif p[2] == "*":
+            if p[1].type != "int" or p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Mult", p[1], p[3], "int")
         elif p[2] == "or":
+            if p[1].type != "bool" or p[3].type != "bool":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Or", p[1], p[3], "bool")
         elif p[2] == "==":
+            if p[1].type == "int" and p[1].type == p[3].type : pass
+            elif p[1].type == "bool" and p[1].type == p[3].type: pass
+            else:
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Equal", p[1], p[3], "bool")
         elif p[2] == "<>":
+            #print(p[1].value, p[1].type)
+            #print(p[3].value, p[3].type)
+            if p[1].type == "int" and p[1].type == p[3].type : pass
+            elif p[1].type == "bool" and p[1].type == p[3].type: pass
+            else:
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("NotEqual", p[1], p[3], "bool")
         elif p[2] == "<=":
+            if p[1].type != "int" or p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Leq", p[1], p[3], "bool")
         elif p[2] == "<":
+            if p[1].type != "int" or p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Less", p[1], p[3], "bool")
         elif p[2] == ">=":
+            if p[1].type != "int" or p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Geq", p[1], p[3], "bool")
         elif p[2] == ">":
+            if p[1].type != "int" or p[3].type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) 
+                if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
             p[0] = Binary_expressions("Greater", p[1],p[3], "bool")
         elif p[2] == ",":
             if p[1].op =="Comma":
