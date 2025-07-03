@@ -515,11 +515,18 @@ def main():
                 p[0] = Binary_expressions("Plus", p[1], p[3], "int")
             elif p[1].type == "String" and p[3].type == "String":
                 p[0] = Binary_expressions("Concat", p[1], p[3], "String")
+            elif (p[1].type == "bool" and p[3].type == "int") or (p[1].type == "int" and p[3].type == "bool") or (p[1].type == "bool" and p[3].type == "bool"):
+                # Casos explícitos que deben dar error
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2))
+                if column <= 0:
+                    column = p.lexpos(2) + 1
+                error_msg = f"Type error at line {line} and column {column}"
+                errores.append(error_msg)
+                p[0] = Binary_expressions("Plus", p[1], p[3], None)
             else:
-                # Hay que colocar lo del erorr
-                # pero no puedo hacerlo hasta resolver
-                # lo de atributos en bloques internos
-                p[0] = Binary_expressions("Concat", p[1], p[3], "String")             
+                # Para otros casos, fuerza la concatenación
+                p[0] = Binary_expressions("Concat", p[1], p[3], "String")
         elif p[2] == "-":
             if p[1].type != "int" or p[3].type != "int":
                 line = p.lineno(2)
@@ -543,14 +550,22 @@ def main():
             p[0] = Binary_expressions("And", p[1], p[3], "bool")
         elif p[2] == ".":
             if isinstance(p[1], Ident):
-                if p[1].type != None and not p[1].type.startswith("function"):
+                if p[1].type is None or not p[1].type.startswith("function"):
+                    # No es función: error de no indexable
                     line = p.lineno(2)
-                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1
-                    if column <= 0: # Ajuste para tokens al inicio de línea
+                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) - 1
+                    if column <= 0:
                         column = p.lexpos(2) + 1
                     error_msg = f"Error. {p[1].value} is not indexable at line {line} and column {column}"
                     errores.append(error_msg)
-
+                elif p[3].type != "int":
+                    # Es función pero índice no es int: error de índice. Es luego del operador indexador . que está el error
+                    line = p.lineno(2)
+                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
+                    if column <= 0:
+                        column = p.lexpos(2) + 1
+                    error_msg = f"Error. Not integer index for function at line {line} and column {column}"
+                    errores.append(error_msg)
             p[0] = Binary_expressions("ReadFunction", p[1], p[3], "int")
         elif p[2] == "*":
             if p[1].type != "int" or p[3].type != "int":
