@@ -21,7 +21,6 @@ class LambdaTranslator:
     """
     def __init__(self):
         # Pila para manejar ámbitos anidados.
-        # Cada elemento es una tupla: (lista_de_nombres_de_vars, mapa_nombre_a_lambda_var)
         self.scope_stack = []
         # Lista ordenada de variables en el ámbito actual. El orden es crucial.
         self.current_vars_ordered = []
@@ -38,10 +37,10 @@ class LambdaTranslator:
         # El nuevo ámbito incluye las variables anteriores más las nuevas.
         self.current_vars_ordered = self.current_vars_ordered + declared_vars_list
         
-        # Reconstruimos el mapa. La numeración de x{i} se basa en la posición en la lista de parámetros lambda.
-        # Corrección del mapeo para que coincida con el orden inverso de los parámetros lambda
+        # FIX: El mapeo debe corresponder al orden de las variables en la lista de estado.
+        # a, b, c -> x1, x2, x3
         new_map = {}
-        for i, var_name in enumerate(reversed(self.current_vars_ordered)):
+        for i, var_name in enumerate(self.current_vars_ordered):
             new_map[var_name] = f"x{i + 1}"
         self.var_to_lambda_map = new_map
 
@@ -55,12 +54,12 @@ class LambdaTranslator:
         return self.var_to_lambda_map.get(var_name, "VAR_NO_ENCONTRADA")
 
     def get_lambda_params_str(self):
-        """Genera el string de parámetros para una función lambda (ej: 'lambda x3:lambda x2:lambda x1:')."""
+        """Genera el string de parámetros para una función lambda (ej: 'lambda x1:lambda x2:lambda x3:')."""
         if not self.current_vars_ordered:
             return ""
-        # Los parámetros se listan en orden inverso a la declaración
+        # FIX: Los parámetros deben coincidir con el orden del estado (a,b,c -> x1,x2,x3)
         params = [self.get_lambda_var(v) for v in self.current_vars_ordered]
-        return "lambda " + ":lambda ".join(reversed(params)) + ":"
+        return "lambda " + ":lambda ".join(params) + ":"
 
     def translate_expression(self, expr_node):
         """Traduce un nodo de expresión del AST a una cadena de expresión de Python."""
@@ -82,14 +81,12 @@ class LambdaTranslator:
                 "Less": "<", "Leq": "<=", "Greater": ">", "Geq": ">="
             }
             if expr_node.op in op_map:
-                # FIX: Se eliminaron los paréntesis incondicionales.
                 return f"{left} {op_map[expr_node.op]} {right}"
             
             if expr_node.op == "ReadFunction":
                 return f"{left}[{right}]"
             
             if expr_node.op == "Comma":
-                 # Construye una lista de Python para asignaciones de funciones
                  if isinstance(expr_node.leftson, Binary_expressions) and expr_node.leftson.op == "Comma":
                      return f"{left[:-1]}, {right}]"
                  else:
@@ -111,7 +108,6 @@ class LambdaTranslator:
 
         lambda_header = self.get_lambda_params_str()
 
-        # Construye la nueva lista de estado con 'cons'
         new_state_parts = []
         for var_name in self.current_vars_ordered:
             if var_name == var_to_assign:
@@ -123,16 +119,12 @@ class LambdaTranslator:
         for part in reversed(new_state_parts):
             cons_chain = f"cons({part})({cons_chain})"
         
-        # FIX: Devuelve solo la transformación de estado 'apply(...)'.
-        # La función llamadora (secuenciación, if, etc.) es responsable
-        # de envolver esto en un 'lambda state: ...' si es necesario.
         return f"apply({lambda_header}{cons_chain})"
 
     def translate_if(self, if_node):
         """Traduce una instrucción 'if', manejando guardias anidadas."""
         
         def build_chain(guard_node, current_vars, lambda_map):
-            """Función auxiliar recursiva para construir la cadena de if-else."""
             original_vars = self.current_vars_ordered
             original_map = self.var_to_lambda_map
             self.current_vars_ordered = current_vars
@@ -161,8 +153,6 @@ class LambdaTranslator:
         tr_instr1 = self.translate_instruction(seq_node.leftson)
         tr_instr2 = self.translate_instruction(seq_node.rightson)
         
-        # FIX: Con la corrección, tr_instr1 y tr_instr2 son llamadas 'apply(...)'.
-        # Esto las compone correctamente: T(I2)(T(I1)(state)).
         return f"(lambda state: {tr_instr2}({tr_instr1}(state)))"
 
     def translate_instruction(self, instruction_node):
@@ -175,11 +165,10 @@ class LambdaTranslator:
             return self.translate_if(instruction_node)
         elif isinstance(instruction_node, Block):
             return self.translate_block(instruction_node)
-        # While, Print y Skip se ignoran en esta etapa y se tratan como la función identidad
         elif isinstance(instruction_node, (While, Print, Skip)):
             return "(lambda state: state)"
         
-        return "(lambda state: state)" # Default para instrucciones no manejadas
+        return "(lambda state: state)"
 
     def get_default_value(self, var_type):
         """Obtiene el valor por defecto para un tipo de variable."""
@@ -192,7 +181,7 @@ class LambdaTranslator:
                 size = int(var_type.split('..')[1][:-1]) + 1
                 return str([0] * size)
             except (ValueError, IndexError):
-                return "[]" # Fallback
+                return "[]"
         return "None"
 
     def translate_block(self, block_node):
@@ -234,7 +223,7 @@ class LambdaTranslator:
         return final_translation
 
 # --------------------------------------------------------------------------
-# Clases del AST (sin cambios, se incluyen por completitud)
+# Clases del AST (sin cambios)
 # --------------------------------------------------------------------------
 class Block():
     def __init__(self,op = None, leftson = None, rightson = None, value = None):
@@ -744,24 +733,20 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
         translator = LambdaTranslator()
         program_lambda = translator.translate_block(result_ast)
         
-        # Construir la llamada 'result = program(...)'
         default_cons_list = "nil"
         for val in reversed(translator.main_block_defaults):
             default_cons_list = f"cons({val})({default_cons_list})"
         result_call = f"result = program({default_cons_list})"
         
-        # Construir la instrucción 'print' final
         main_vars = translator.main_block_vars
         if main_vars:
-            # El orden de los parámetros lambda debe ser inverso al de las variables
-            print_lambda_header = "lambda " + ":lambda ".join(reversed(main_vars)) + ":"
-            # El diccionario usa los nombres originales de las variables
+            # FIX: El orden de los parámetros lambda debe coincidir con el orden de las variables
+            print_lambda_header = "lambda " + ":lambda ".join(main_vars) + ":"
             print_dict = "{" + ", ".join([f"'{v}':{v}" for v in main_vars]) + "}"
             print_statement = f"print(apply({print_lambda_header}{print_dict})(result))"
         else:
             print_statement = "print('No variables declared in main block')"
 
-        # Ensamblar y escribir el archivo de salida
         final_code = (
             f"{combinators}\n"
             f"program = {program_lambda}\n\n"
