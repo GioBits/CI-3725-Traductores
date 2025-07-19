@@ -193,6 +193,7 @@ def main():
     # Los nodos almacenan el operador de la construcción y sus hijos (sub-árboles).
 
 
+
     # Tabla de simbolos por alcance (scope)
     SymbolTableStack = [{}]
 
@@ -889,7 +890,32 @@ def main():
     # Imprime el Árbol de Sintaxis Abstracta (AST) si el análisis fue exitoso.
     if result:
         if not errores:
-            imprimir_ast(result, 0) # Llama a la función auxiliar para imprimir el AST.
+            
+            ## aquí comienza la salida de la etapa 4
+            basicos = """
+Z = lambda g:(lambda x:g(lambda v:x(x)(v)))(lambda x:g(lambda v:x(x)(v)))
+true = lambda x:lambda y:x
+false = lambda x:lambda y:y
+nil = lambda x:true
+cons = lambda x:lambda y:lambda f: f(x)(y)
+head = lambda p: p(true)
+tail = lambda p:p(false)
+apply = Z(lambda g:lambda f:lambda x:f if x==nil else (g(f(head(x)))(tail(x))))
+lift_do=lambda exp:lambda f:lambda g: lambda x: g(f(x)) if (exp(x)) else x
+do=lambda exp:lambda f:Z(lift_do(exp)(f))
+            """
+            nombre = sys.argv[1].split('.')[0]
+            with open(f"{nombre}.py", "w") as Salida:
+                Salida.write(basicos)
+
+
+
+
+
+
+
+
+
         else:
             # Imprime el primer error encontrado para mantener la consistencia
             print(errores[0])
