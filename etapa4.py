@@ -93,7 +93,9 @@ class LambdaTranslator:
             
             # UPDATE: Traducir el acceso a funciones/arreglos usando el combinador 'nth'.
             if expr_node.op == "ReadFunction":
-                return f"nth({right})({left})"
+                # Si se eliminó nth, esta funcionalidad no será directamente soportada.
+                # Se dejará como un placeholder o error si se encuentra.
+                return f"/* ERROR: nth no está definido si se eliminó. */({left}({right}))" 
 
             op_map = {
                 "Plus": "+", "Minus": "-", "Mult": "*",
@@ -177,16 +179,15 @@ class LambdaTranslator:
             index_expr = self.translate_expression(asig_node.leftson.rightson)
             value_expr = self.translate_expression(asig_node.rightson)
 
-            # El estado actual del array (antes de la actualización)
+            # Si se eliminó update_nth, esta funcionalidad no será directamente soportada.
+            # Se dejará como un placeholder o error si se encuentra.
             array_current_state = self.get_lambda_var(array_name)
+            updated_array_expr = f"/* ERROR: update_nth no está definido si se eliminó. */({array_current_state}, {index_expr}, {value_expr})"
 
-            # Construir la nueva lista de estado con el array actualizado
             lambda_header = self.get_lambda_params_str()
             new_state_parts = []
             for var_name in self.current_vars_ordered:
                 if var_name == array_name:
-                    # Aplicar update_nth al estado actual del array
-                    updated_array_expr = f"update_nth({index_expr})({value_expr})({array_current_state})"
                     new_state_parts.append(updated_array_expr)
                 else:
                     new_state_parts.append(self.get_lambda_var(var_name))
@@ -258,16 +259,15 @@ class LambdaTranslator:
             return "0"
         elif var_type == "bool":
             return "false"
-        # UPDATE: Generar una lista 'cons' para funciones/arreglos.
+        # Si se eliminó la función de ayuda para listas Church, la representación
+        # de funciones/arreglos por defecto será simplemente 'nil' o un placeholder.
         elif var_type.startswith("function"):
             try:
+                # El tamaño se usa para indicar una función/arreglo de cierto tamaño
+                # pero sin la capacidad de llenarla con valores por defecto de Church-list
+                # se devuelve nil, o un string representativo.
                 size = int(var_type.split('..')[1][:-1])
-                # La longitud real de la lista es `size + 1` (índices de 0 a `size`)
-                length = size + 1 
-                default_list = "nil"
-                for _ in range(length):
-                    default_list = f"cons(0)({default_list})" # Valores por defecto para elementos de la función/arreglo
-                return default_list
+                return "nil" # O podrías devolver algo como f"lambda_function_of_size_{size}"
             except (ValueError, IndexError):
                 return "nil" # Fallback si el formato no es el esperado
         return "None"
@@ -682,6 +682,7 @@ def main():
                 return
 
             # Asumiendo que los elementos del array son enteros basados en `nth` y `get_default_value`
+            # Esta validación se mantiene, pero la traducción real dependerá de `update_nth`
             if right_side.type != "int":
                 line = p.lineno(2)
                 column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
@@ -885,7 +886,7 @@ def main():
             print(errores[0])
             sys.exit(1)
             
-        # UPDATE: Se añade el combinador 'nth' y 'update_nth' para acceder y modificar elementos de una lista 'cons'.
+        # Modificado: Se eliminan nth, update_nth y church_list_to_python_list
         combinators = """
 Z = lambda g:(lambda x:g(lambda v:x(x)(v)))(lambda x:g(lambda v:x(x)(v)))
 true = lambda x:lambda y:x
@@ -897,27 +898,6 @@ tail = lambda p:p(false)
 apply = Z(lambda g:lambda f:lambda x:f if x==nil else g(f(head(x)))(tail(x)))
 lift_do = lambda exp: lambda f: lambda g: lambda x: g(f(x)) if exp(x)(True)(False) else x
 do = lambda exp: lambda f: Z(lift_do(exp)(f))
-nth = Z(lambda g: lambda n: lambda l: head(l) if n == 0 else g(n-1)(tail(l)))
-update_nth = Z(lambda g: lambda n: lambda val: lambda l: \\
-  cons(val)(tail(l)) if n == 0 else cons(head(l))(g(n-1)(val)(tail(l))))
-
-# Helper function to convert Church-encoded list to Python list for printing
-def church_list_to_python_list(church_list):
-    result = []
-    current = church_list
-    while current != nil:
-        try:
-            # Attempt to get the head. If it's a boolean, convert from Church boolean.
-            h = head(current)
-            if callable(h) and h(True)(False) in [True, False]: # Check if it's a Church boolean
-                result.append(h(True)(False))
-            else:
-                result.append(h)
-            current = tail(current)
-        except Exception:
-            # If head(current) fails (e.g., trying to get head of nil), break
-            break
-    return result
 """
         
         translator = LambdaTranslator()
@@ -943,11 +923,10 @@ def church_list_to_python_list(church_list):
                 var_type = main_var_types.get(v_name)
                 if var_type == 'bool':
                     dict_parts.append(f"'{v_name}': {v_name}(True)(False)")
-                # UPDATE: Para la impresión, ahora se intenta mostrar el contenido de la lista 'cons'
-                # si es una función/arreglo, de lo contrario, se muestra como un string.
+                # Modificado: Si ya no se usa church_list_to_python_list, se imprime el valor
+                # tal cual o un mensaje para tipos de función/arreglo.
                 elif var_type.startswith('function'):
-                    # Ahora se convierte la lista Church a una lista de Python para imprimir
-                    dict_parts.append(f"'{v_name}': church_list_to_python_list({v_name})")
+                    dict_parts.append(f"'{v_name}': 'Función/Arreglo (representación lambda)'") # O simplemente f"'{v_name}': {v_name}"
                 else:
                     dict_parts.append(f"'{v_name}': {v_name}")
             
@@ -969,4 +948,4 @@ def church_list_to_python_list(church_list):
         print(f"Traducción completada. Archivo generado: {output_filename}")
 
 if __name__ == "__main__":
-    main() 
+    main()
