@@ -26,17 +26,24 @@ class LambdaTranslator:
         self.current_vars_ordered = []
         # Mapa del nombre de la variable (ej: 'a') a su nombre en lambda (ej: 'x1').
         self.var_to_lambda_map = {}
+        self.var_to_type_map = {}
         # Atributos para almacenar información del bloque principal para el archivo final
         self.main_block_vars = []
         self.main_block_defaults = []
+        self.main_block_var_types = {}
 
-    def enter_scope(self, declared_vars_list):
-        """Entra en un nuevo ámbito, actualizando la lista de variables y el mapeo."""
-        self.scope_stack.append((self.current_vars_ordered, self.var_to_lambda_map))
+    def enter_scope(self, declared_vars_with_types):
+        """
+        Entra en un nuevo ámbito, actualizando la lista de variables, mapeos y tipos.
+        """
+        self.scope_stack.append((self.current_vars_ordered, self.var_to_lambda_map, self.var_to_type_map))
         
-        # El nuevo ámbito incluye las variables anteriores más las nuevas.
+        declared_vars_list = list(declared_vars_with_types.keys())
         self.current_vars_ordered = self.current_vars_ordered + declared_vars_list
         
+        self.var_to_type_map = self.var_to_type_map.copy()
+        self.var_to_type_map.update(declared_vars_with_types)
+
         new_map = {}
         for i, var_name in enumerate(self.current_vars_ordered):
             new_map[var_name] = f"x{i + 1}"
@@ -44,19 +51,24 @@ class LambdaTranslator:
 
 
     def exit_scope(self):
-        """Sale del ámbito actual y restaura el anterior."""
-        self.current_vars_ordered, self.var_to_lambda_map = self.scope_stack.pop()
+        """
+        Sale del ámbito actual y restaura el anterior.
+        """
+        self.current_vars_ordered, self.var_to_lambda_map, self.var_to_type_map = self.scope_stack.pop()
 
     def get_lambda_var(self, var_name):
         """Obtiene el nombre de la variable lambda correspondiente a un nombre de variable."""
         return self.var_to_lambda_map.get(var_name, "VAR_NO_ENCONTRADA")
 
     def get_lambda_params_str(self):
-        """Genera el string de parámetros para una función lambda en orden inverso (ej: 'lambda x3:lambda x2:lambda x1:')."""
+        """
+        Genera el string de parámetros para una función lambda.
+        El orden de los parámetros debe coincidir con el orden de las variables en la lista de estado.
+        Ej: para (a,b,c) la lambda debe ser (lambda a: lambda b: lambda c: ...)
+        """
         if not self.current_vars_ordered:
             return ""
-        # La salida deseada requiere que los parámetros estén en orden inverso.
-        params = [self.get_lambda_var(v) for v in reversed(self.current_vars_ordered)]
+        params = [self.get_lambda_var(v) for v in self.current_vars_ordered]
         return "lambda " + ":lambda ".join(params) + ":"
 
     def translate_expression(self, expr_node):
@@ -73,61 +85,119 @@ class LambdaTranslator:
             left = self.translate_expression(expr_node.leftson)
             right = self.translate_expression(expr_node.rightson)
             
+            # Las operaciones booleanas deben usar la lógica de Church, no los operadores de Python.
+            if expr_node.op == "And":
+                return f"({left}({right})(false))"
+            if expr_node.op == "Or":
+                return f"({left}(true)({right}))"
+            
+            # UPDATE: Traducir el acceso a funciones/arreglos usando el combinador 'nth'.
+            if expr_node.op == "ReadFunction":
+                return f"nth({right})({left})"
+
             op_map = {
                 "Plus": "+", "Minus": "-", "Mult": "*",
-                "And": " and ", "Or": " or ", "Equal": "==", "NotEqual": "!=",
+                "Equal": "==", "NotEqual": "!=",
                 "Less": "<", "Leq": "<=", "Greater": ">", "Geq": ">="
             }
             if expr_node.op in op_map:
-                # Se eliminan paréntesis innecesarios para que coincida con la salida deseada
-                return f"{left}{op_map[expr_node.op]}{right}"
-            
-            if expr_node.op == "ReadFunction":
-                return f"{left}[{right}]"
+                # Se envuelven las comparaciones en una lambda para convertirlas a booleanos de Church
+                if expr_node.op in ["Equal", "NotEqual", "Less", "Leq", "Greater", "Geq"]:
+                    return f"((lambda x: true if x else false)({left}{op_map[expr_node.op]}{right}))"
+                return f"({left}{op_map[expr_node.op]}{right})"
             
             if expr_node.op == "Comma":
-                 if isinstance(expr_node.leftson, Binary_expressions) and expr_node.leftson.op == "Comma":
-                     return f"{left[:-1]}, {right}]"
-                 else:
-                     return f"[{left}, {right}]"
+                # Helper to flatten the comma expression into an ordered list of translated elements
+                def flatten_comma_expression(node):
+                    if isinstance(node, Binary_expressions) and node.op == "Comma":
+                        # Recursively flatten the left side, then add the right side
+                        return flatten_comma_expression(node.leftson) + [self.translate_expression(node.rightson)]
+                    else:
+                        # Base case: a single element
+                        return [self.translate_expression(node)]
+
+                elements_translated = flatten_comma_expression(expr_node)
+                
+                # Build the Church list from the collected elements
+                cons_chain = "nil"
+                # Iterate in reverse to build the cons list in the correct order
+                for element_str in reversed(elements_translated):
+                    cons_chain = f"cons({element_str})({cons_chain})"
+                return cons_chain
 
         elif isinstance(expr_node, UExpresson):
             operand = self.translate_expression(expr_node.leftson)
+            # La negación booleana debe usar la lógica de Church.
             if expr_node.op == "Not":
-                return f"(not {operand})"
-            # FIX: Se corrige la traducción del operador unario Menos.
+                return f"({operand}(false)(true))"
             if expr_node.op == "Minus":
                 return f"-{operand}"
+        # La clase WriteFunction en translate_expression no debería generar un valor,
+        # sino que representa el lado izquierdo de una asignación indexada.
+        # Por lo tanto, este caso no debería ser alcanzado aquí si el parser es correcto.
+        # Si se alcanza, es un error de diseño o parseo.
+        elif isinstance(expr_node, WriteFunction):
+            return "ErrorWriteFunctionInExpression"
             
         return "ErrorExpr"
 
     def translate_assignment_body(self, asig_node):
         """Traduce el cuerpo de una asignación a una llamada 'apply(...)' sin aplicar al estado."""
-        var_to_assign = asig_node.leftson.value
-        expr_translation = self.translate_expression(asig_node.rightson)
-        lambda_header = self.get_lambda_params_str()
-        new_state_parts = []
-        for var_name in self.current_vars_ordered:
-            if var_name == var_to_assign:
-                new_state_parts.append(expr_translation)
+        
+        # Manejar asignación a una variable regular o a un array/función indexado
+        if isinstance(asig_node.leftson, Ident):
+            var_to_assign_name = asig_node.leftson.value
+            var_type = self.var_to_type_map.get(var_to_assign_name)
+            
+            if var_type and var_type.startswith("function"):
+                # Si se asigna una lista Church completa a una variable de función/array (ej. A := 1,2,3)
+                expr_translation = self.translate_expression(asig_node.rightson)
             else:
-                new_state_parts.append(self.get_lambda_var(var_name))
-        
-        cons_chain = "nil"
-        new_state_parts.reverse()
-        # FIX: Para construir la lista cons(c)(cons(b)(cons(a)...)) se debe
-        # iterar sobre las partes en el orden c, b, a.
-        for part in new_state_parts:
-            cons_chain = f"cons({part})({cons_chain})"
-        
-        # Se invierte el orden de construcción para que coincida con la salida deseada.
-        new_state_parts.reverse()
-        cons_chain = "nil"
-        for part in new_state_parts:
-            cons_chain = f"cons({part})({cons_chain})"
+                # Asignación de variable regular
+                expr_translation = self.translate_expression(asig_node.rightson)
 
-        return f"(apply({lambda_header}{cons_chain}))"
+            lambda_header = self.get_lambda_params_str()
+            
+            new_state_parts = []
+            for var_name in self.current_vars_ordered:
+                if var_name == var_to_assign_name:
+                    new_state_parts.append(expr_translation)
+                else:
+                    new_state_parts.append(self.get_lambda_var(var_name))
+            
+            cons_chain = "nil"
+            for part in reversed(new_state_parts):
+                cons_chain = f"cons({part})({cons_chain})"
 
+            return f"(apply({lambda_header}{cons_chain}))"
+
+        elif isinstance(asig_node.leftson, WriteFunction):
+            # Manejar asignación a un elemento indexado de una función/array (ej. A(index) := value)
+            array_name = asig_node.leftson.leftson.value
+            index_expr = self.translate_expression(asig_node.leftson.rightson)
+            value_expr = self.translate_expression(asig_node.rightson)
+
+            # El estado actual del array (antes de la actualización)
+            array_current_state = self.get_lambda_var(array_name)
+
+            # Construir la nueva lista de estado con el array actualizado
+            lambda_header = self.get_lambda_params_str()
+            new_state_parts = []
+            for var_name in self.current_vars_ordered:
+                if var_name == array_name:
+                    # Aplicar update_nth al estado actual del array
+                    updated_array_expr = f"update_nth({index_expr})({value_expr})({array_current_state})"
+                    new_state_parts.append(updated_array_expr)
+                else:
+                    new_state_parts.append(self.get_lambda_var(var_name))
+            
+            cons_chain = "nil"
+            for part in reversed(new_state_parts):
+                cons_chain = f"cons({part})({cons_chain})"
+
+            return f"(apply({lambda_header}{cons_chain}))"
+
+        return "ErrorAssignment" # No debería llegar aquí
 
     def translate_if_lambda(self, if_node):
         """Traduce una instrucción 'if' a una función lambda completa que toma un estado."""
@@ -144,11 +214,15 @@ class LambdaTranslator:
         for then_node in reversed(guards_list):
             cond_expr_str = self.translate_expression(then_node.leftson)
             lambda_header = self.get_lambda_params_str()
+            # La función de la condición se aplica al estado actual 'x1'
             cond_function_call = f"apply({lambda_header}{cond_expr_str})(x1)"
             
+            # La condición debe evaluarse como un booleano de Church.
+            evaluated_condition = f"{cond_function_call}(True)(False)"
+
             then_body_expression = self.translate_instruction(then_node.rightson, "x1")
 
-            nested_else_branch = f"({then_body_expression} if {cond_function_call} else {nested_else_branch})"
+            nested_else_branch = f"({then_body_expression} if {evaluated_condition} else {nested_else_branch})"
             
         return f"(lambda x1: {nested_else_branch})"
 
@@ -184,41 +258,49 @@ class LambdaTranslator:
             return "0"
         elif var_type == "bool":
             return "false"
+        # UPDATE: Generar una lista 'cons' para funciones/arreglos.
         elif var_type.startswith("function"):
             try:
-                size = int(var_type.split('..')[1][:-1]) + 1
-                return str([0] * size)
+                size = int(var_type.split('..')[1][:-1])
+                # La longitud real de la lista es `size + 1` (índices de 0 a `size`)
+                length = size + 1 
+                default_list = "nil"
+                for _ in range(length):
+                    default_list = f"cons(0)({default_list})" # Valores por defecto para elementos de la función/arreglo
+                return default_list
             except (ValueError, IndexError):
-                return "[]"
+                return "nil" # Fallback si el formato no es el esperado
         return "None"
 
     def translate_block(self, block_node):
-        """Traduce un bloque. Devuelve una función lambda completa (lambda x1: ...)."""
+        """
+        Traduce un bloque. Devuelve una función lambda completa (lambda x1: ...).
+        """
         is_main_block = not self.scope_stack
 
-        declared_vars = []
+        declared_vars_with_types = {}
         default_values = []
         if block_node.leftson and block_node.leftson.children:
-            for declare_node in block_node.leftson.children:
+            # Asegurar un orden consistente de declaración.
+            sorted_children = sorted(block_node.leftson.children, key=lambda d: d.VariableAndType[1][0])
+            for declare_node in sorted_children:
                 var_type = declare_node.VariableAndType[0]
                 vars_list = declare_node.VariableAndType[1]
-                declared_vars.extend(vars_list)
-                for _ in vars_list:
+                for var_name in vars_list:
+                    declared_vars_with_types[var_name] = var_type
                     default_values.append(self.get_default_value(var_type))
 
-        self.enter_scope(declared_vars)
+        self.enter_scope(declared_vars_with_types)
 
-        # La traducción del cuerpo ahora es una expresión, no una lambda completa.
-        # El estado inicial para el cuerpo del bloque es 'x1'.
         body_expression = self.translate_instruction(block_node.rightson, "x1")
 
         if is_main_block:
             self.main_block_vars = self.current_vars_ordered[:]
+            self.main_block_var_types = self.var_to_type_map.copy()
             self.main_block_defaults = default_values
-            # La traducción final es la lambda para el bloque principal.
             final_translation = f"(lambda x1: {body_expression})"
         else:
-            num_new_vars = len(declared_vars)
+            num_new_vars = len(declared_vars_with_types)
             
             initial_state_cons = "x1"
             for val in reversed(default_values):
@@ -257,7 +339,7 @@ class SequencingDeclare(Block): pass
 class Declare():
     def __init__(self, op = None, VariableAndType = []):
         self.op = op; self.VariableAndType = VariableAndType
-class WriteFunction(Block): pass
+class WriteFunction(Block): pass # Nueva clase para representar la asignación a funciones/arreglos
 class Asig(Block): pass
 class If(Block): pass
 class While(Block): pass
@@ -330,7 +412,9 @@ def main():
         ("left", "TkLeq", "TkLess", "TkGreater", "TkGeq"),
         ("left", "TkComma"), ("left", "TkTwoPoints"),
         ("left", "TkPlus", "TkMinus"), ("left", "TkMult"),
-        ("right", "UMinus", "TkNot"), ("left", "TkApp")
+        ("right", "UMinus", "TkNot"), 
+        # UPDATE: Se cambia la asociatividad de TkApp para que el parseo sea correcto.
+        ("left", "TkApp")
     )
     start = "Block"
 
@@ -521,39 +605,101 @@ def main():
         """
         Asig : Ident TkAsig expression
         """
-        if p[1].type is None:
-            line = p.lineno(2)
-            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-len(p[1].value)
-            if column <= 0: column = p.lexpos(2) + 1
-            error_msg = f"Variable {p[1].value} not declared at line {line} and column {column}"
-            errores.append(error_msg)
-            pass
+        left_side = p[1]
+        right_side = p[3]
+        
+        if isinstance(left_side, Ident):
+            var_name = left_side.value
+            symbol_info = lookup_symbol(var_name)
+            
+            if symbol_info is None:
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-len(left_side.value)
+                if column <= 0: column = p.lexpos(2) + 1
+                errores.append(f"Variable {var_name} not declared at line {line} and column {column}")
+                p[0] = Asig("Asig", left_side, right_side)
+                return
 
-        if p[1].type == p[3].type or (p[1].type == "function[..0]" and p[3].type== "int"):
-            p[0] = Asig("Asig", p[1], p[3])
-        elif p[1].type != None and p[3].type != None and p[1].type.startswith("function") and p[3].type.startswith("function") and p[1].type[11] != p[3].type[11]:
-            line = p.lineno(2)
-            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) +1
-            if column <= 0: column = p.lexpos(2) + 1
-            error_msg = f"It is expected a list of length {int(p[1].type[11])+1} at line {line} and column {column}"
-            errores.append(error_msg)
-            p[0] = Asig("Asig", p[1], p[3])
-        elif p[1].type != p[3].type and p[3].op != None and p[3].type != None and p[3].type.startswith("function") and p[3].op.startswith("WriteFunction"):
-            line = p.lineno(2)
-            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-(len(p[1].value))
-            if column <= 0: column = p.lexpos(2) + 1
-            error_msg = f"Variable {p[1].value} is expected to be a function at line {line} and column {column}"
-            errores.append(error_msg)
-            p[0] = Asig("Asig", p[1], p[3])
-        elif p[1].type is not None and p[3].type is not None and p[1].type != p[3].type:
-            line = p.lineno(2)
-            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-(len(p[1].value))
-            if column <= 0: column = p.lexpos(2) + 1
-            error_msg = f"Type error. Variable {p[1].value} has different type than expression at line {line} and column {column}"
-            errores.append(error_msg)
-            p[0] = Asig("Asig", p[1], p[3])
+            left_type = symbol_info['type']
+            right_type = right_side.type
+
+            if left_type.startswith("function"):
+                if right_side.op == "Comma":
+                    expected_size = int(left_type.split('..')[1][:-1]) + 1
+                    actual_size = right_side.number
+                    if actual_size != expected_size:
+                        line = p.lineno(2)
+                        column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
+                        if column <= 0: column = p.lexpos(2) + 1
+                        errores.append(f"Se esperaba una lista de longitud {expected_size} en la línea {line} y columna {column}")
+                    p[0] = Asig("Asig", left_side, right_side)
+                else:
+                    line = p.lineno(2)
+                    column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
+                    if column <= 0: column = p.lexpos(2) + 1
+                    errores.append(f"Se esperaba una lista de valores para la función/arreglo {var_name} en la línea {line} y columna {column}")
+                    p[0] = Asig("Asig", left_side, right_side)
+            elif left_type == "function[..0]" and right_type == "int": # Caso especial para asignación de función de un solo elemento
+                p[0] = Asig("Asig", left_side, right_side)
+            elif left_type != right_type:
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-(len(left_side.value))
+                if column <= 0: column = p.lexpos(2) + 1
+                errores.append(f"Type error. Variable {var_name} has different type than expression at line {line} and column {column}")
+                p[0] = Asig("Asig", left_side, right_side)
+            else:
+                p[0] = Asig("Asig", left_side, right_side)
+
+        elif isinstance(left_side, WriteFunction): # Esto es para A(index) := value
+            array_ident_node = left_side.leftson
+            index_expr_node = left_side.rightson
+            
+            array_name = array_ident_node.value
+            array_symbol_info = lookup_symbol(array_name)
+
+            if array_symbol_info is None:
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-len(array_name)
+                if column <= 0: column = p.lexpos(2) + 1
+                errores.append(f"Variable {array_name} not declared at line {line} and column {column}")
+                p[0] = Asig("Asig", left_side, right_side)
+                return
+
+            if not array_symbol_info['type'].startswith("function"):
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) -1-len(array_name)
+                if column <= 0: column = p.lexpos(2) + 1
+                errores.append(f"Variable {array_name} is not a function/array and cannot be indexed at line {line} and column {column}")
+                p[0] = Asig("Asig", left_side, right_side)
+                return
+            
+            if index_expr_node.type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
+                if column <= 0: column = p.lexpos(2) + 1
+                errores.append(f"Index for function/array must be an integer at line {line} and column {column}")
+                p[0] = Asig("Asig", left_side, right_side)
+                return
+
+            # Asumiendo que los elementos del array son enteros basados en `nth` y `get_default_value`
+            if right_side.type != "int":
+                line = p.lineno(2)
+                column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
+                if column <= 0: column = p.lexpos(2) + 1
+                errores.append(f"Type error: Array elements are expected to be integers, found {right_side.type} at line {line} and column {column}")
+                p[0] = Asig("Asig", left_side, right_side)
+                return
+
+            p[0] = Asig("Asig", left_side, right_side)
+
         else:
-            p[0] = Asig("Asig", p[1], p[3])
+            # Fallback para tipos de lado izquierdo inesperados
+            line = p.lineno(2)
+            column = p.lexpos(2) - p.lexer.lexdata.rfind('\n', 0, p.lexpos(2)) + 1
+            if column <= 0: column = p.lexpos(2) + 1
+            errores.append(f"Invalid assignment left-hand side at line {line} and column {column}")
+            p[0] = Asig("Asig", left_side, right_side)
+
 
     def p_if(p):
         """ If : TkIf Guard TkFi """
@@ -625,24 +771,28 @@ def main():
             if p[1].type != "bool" or p[3].type != "bool":
                 errores.append(f"Type error at line {p.lineno(2)}")
             type_result = "bool"
-        elif op_name in ["Equal", "NotEqual"]:
-            if p[1].type != p[3].type:
-                errores.append(f"Type error for {p[2]} at line {p.lineno(2)}")
-            type_result = "bool"
-        elif op_name in ["Leq", "Less", "Geq", "Greater"]:
+        elif op_name in ["Equal", "NotEqual", "Leq", "Less", "Geq", "Greater"]:
             if p[1].type != "int" or p[3].type != "int":
                 errores.append(f"Type error for {p[2]} at line {p.lineno(2)}")
             type_result = "bool"
+        # UPDATE: Se maneja el tipo de retorno para el acceso a funciones/arreglos.
         elif op_name == "ReadFunction":
             if not (p[1].type and p[1].type.startswith("function")):
                 errores.append(f"Error: {p[1].value} is not indexable at line {p.lineno(2)}")
             if p[3].type != "int":
                 errores.append(f"Error: Not integer index for function at line {p.lineno(2)}")
-            type_result = "int"
+            type_result = "int" # Asumimos que las funciones/arreglos contienen enteros.
         elif op_name == "Comma":
-            if p[1].op == "Comma":
+            # Si el lado izquierdo ya es una expresión de Comma, se concatena
+            if isinstance(p[1], Binary_expressions) and p[1].op == "Comma":
+                # Asegura que el tipo del elemento que se añade sea int
+                if p[3].type != "int":
+                    errores.append(f"Error: Se esperaba un entero en la lista de la función/arreglo en la línea {p.lineno(2)}")
                 p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{p[1].number}]", p[1].number+1)
             else:
+                # Si es el inicio de una lista de Comma, se verifica que los elementos sean enteros
+                if p[1].type != "int" or p[3].type != "int":
+                    errores.append(f"Error: Se esperaban enteros en la lista de la función/arreglo en la línea {p.lineno(2)}")
                 p[0] = Binary_expressions("Comma", p[1], p[3], f"function[..{1}]", 2)
             return
 
@@ -668,11 +818,17 @@ def main():
 
     def p_factor_writefunction(p):
         """ factor : factor TkOpenPar expression TkClosePar """
+        # Este es el caso para A(index)
         if p[1].type and p[1].type.startswith("function"):
-            p[0] = Binary_expressions("WriteFunction", p[1], p[3], p[1].type)
+            if p[3].type != "int":
+                errores.append(f"Error: Se esperaba un índice entero para la función en la línea {p.lineno(2)}")
+            # WriteFunction ahora representa el lado izquierdo de una asignación indexada,
+            # no una expresión que produce un valor.
+            p[0] = WriteFunction("WriteFunction", p[1], p[3], p[1].type) 
         else:
-            errores.append(f"The function modification operator is used on a non-function variable at line {p.lineno(2)}")
-            p[0] = Binary_expressions("WriteFunction", p[1], p[3], p[1].type)
+            errores.append(f"El operador de indexación se usa en una variable no función en la línea {p.lineno(2)}")
+            p[0] = WriteFunction("WriteFunction", p[1], p[3], p[1].type)
+
 
     def p_subtitutions(p):
         """
@@ -729,6 +885,7 @@ def main():
             print(errores[0])
             sys.exit(1)
             
+        # UPDATE: Se añade el combinador 'nth' y 'update_nth' para acceder y modificar elementos de una lista 'cons'.
         combinators = """
 Z = lambda g:(lambda x:g(lambda v:x(x)(v)))(lambda x:g(lambda v:x(x)(v)))
 true = lambda x:lambda y:x
@@ -738,26 +895,63 @@ cons = lambda x:lambda y:lambda f: f(x)(y)
 head = lambda p: p(true)
 tail = lambda p:p(false)
 apply = Z(lambda g:lambda f:lambda x:f if x==nil else g(f(head(x)))(tail(x)))
-lift_do = lambda exp: lambda f: lambda g: lambda x: g(f(x)) if exp(x) else x
+lift_do = lambda exp: lambda f: lambda g: lambda x: g(f(x)) if exp(x)(True)(False) else x
 do = lambda exp: lambda f: Z(lift_do(exp)(f))
+nth = Z(lambda g: lambda n: lambda l: head(l) if n == 0 else g(n-1)(tail(l)))
+update_nth = Z(lambda g: lambda n: lambda val: lambda l: \\
+  cons(val)(tail(l)) if n == 0 else cons(head(l))(g(n-1)(val)(tail(l))))
+
+# Helper function to convert Church-encoded list to Python list for printing
+def church_list_to_python_list(church_list):
+    result = []
+    current = church_list
+    while current != nil:
+        try:
+            # Attempt to get the head. If it's a boolean, convert from Church boolean.
+            h = head(current)
+            if callable(h) and h(True)(False) in [True, False]: # Check if it's a Church boolean
+                result.append(h(True)(False))
+            else:
+                result.append(h)
+            current = tail(current)
+        except Exception:
+            # If head(current) fails (e.g., trying to get head of nil), break
+            break
+    return result
 """
         
         translator = LambdaTranslator()
-        # La llamada a translate_block ahora devuelve la lambda final del programa
         program_lambda = translator.translate_block(result_ast)
         
         default_cons_list = "nil"
         for val in reversed(translator.main_block_defaults):
             default_cons_list = f"cons({val})({default_cons_list})"
         
-        # La llamada al programa ahora es directa
-        result_call = f"result = program({default_cons_list})"
+        program_call_state = default_cons_list
+        
+        result_call = f"result = program({program_call_state})"
         
         main_vars = translator.main_block_vars
+        main_var_types = translator.main_block_var_types
+
         if main_vars:
-            # FIX: El orden de los parámetros lambda se invierte para que coincida con la salida deseada.
-            print_lambda_header = "lambda " + ":lambda ".join(reversed(main_vars)) + ":"
-            print_dict = "{" + ", ".join([f"'{v}':{v}" for v in main_vars]) + "}"
+            # El orden de los parámetros de la lambda debe coincidir con el orden de las variables.
+            print_lambda_header = "lambda " + ":lambda ".join(main_vars) + ":"
+            
+            dict_parts = []
+            for v_name in main_vars:
+                var_type = main_var_types.get(v_name)
+                if var_type == 'bool':
+                    dict_parts.append(f"'{v_name}': {v_name}(True)(False)")
+                # UPDATE: Para la impresión, ahora se intenta mostrar el contenido de la lista 'cons'
+                # si es una función/arreglo, de lo contrario, se muestra como un string.
+                elif var_type.startswith('function'):
+                    # Ahora se convierte la lista Church a una lista de Python para imprimir
+                    dict_parts.append(f"'{v_name}': church_list_to_python_list({v_name})")
+                else:
+                    dict_parts.append(f"'{v_name}': {v_name}")
+            
+            print_dict = "{" + ", ".join(dict_parts) + "}"
             print_statement = f"print(apply({print_lambda_header}{print_dict})(result))"
         else:
             print_statement = "print('No variables declared in main block')"
