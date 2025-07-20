@@ -1,5 +1,5 @@
 # Owner(s): Sergio Carrillo 14-11315 y David Pereira 18-10245
-# Date: 19 de julio de 2025 (Corregido para Etapa 4)
+# Date: 20 de julio de 2025 (Corregido para Etapa 4)
 # Description: Proyecto Etapa 4 CI-3725 Traductores e Interpretadores -
 #              Implementación de un traductor de un lenguaje imperativo
 #              a funciones Lambda en Python.
@@ -37,8 +37,6 @@ class LambdaTranslator:
         # El nuevo ámbito incluye las variables anteriores más las nuevas.
         self.current_vars_ordered = self.current_vars_ordered + declared_vars_list
         
-        # FIX: El mapeo debe corresponder al orden de las variables en la lista de estado.
-        # a, b, c -> x1, x2, x3
         new_map = {}
         for i, var_name in enumerate(self.current_vars_ordered):
             new_map[var_name] = f"x{i + 1}"
@@ -54,11 +52,11 @@ class LambdaTranslator:
         return self.var_to_lambda_map.get(var_name, "VAR_NO_ENCONTRADA")
 
     def get_lambda_params_str(self):
-        """Genera el string de parámetros para una función lambda (ej: 'lambda x1:lambda x2:lambda x3:')."""
+        """Genera el string de parámetros para una función lambda en orden inverso (ej: 'lambda x3:lambda x2:lambda x1:')."""
         if not self.current_vars_ordered:
             return ""
-        # FIX: Los parámetros deben coincidir con el orden del estado (a,b,c -> x1,x2,x3)
-        params = [self.get_lambda_var(v) for v in self.current_vars_ordered]
+        # La salida deseada requiere que los parámetros estén en orden inverso.
+        params = [self.get_lambda_var(v) for v in reversed(self.current_vars_ordered)]
         return "lambda " + ":lambda ".join(params) + ":"
 
     def translate_expression(self, expr_node):
@@ -77,11 +75,12 @@ class LambdaTranslator:
             
             op_map = {
                 "Plus": "+", "Minus": "-", "Mult": "*",
-                "And": "and", "Or": "or", "Equal": "==", "NotEqual": "!=",
+                "And": " and ", "Or": " or ", "Equal": "==", "NotEqual": "!=",
                 "Less": "<", "Leq": "<=", "Greater": ">", "Geq": ">="
             }
             if expr_node.op in op_map:
-                return f"({left} {op_map[expr_node.op]} {right})"
+                # Se eliminan paréntesis innecesarios para que coincida con la salida deseada
+                return f"{left}{op_map[expr_node.op]}{right}"
             
             if expr_node.op == "ReadFunction":
                 return f"{left}[{right}]"
@@ -96,119 +95,88 @@ class LambdaTranslator:
             operand = self.translate_expression(expr_node.leftson)
             if expr_node.op == "Not":
                 return f"(not {operand})"
+            # FIX: Se corrige la traducción del operador unario Menos.
             if expr_node.op == "Minus":
-                return f"(-{operand})"
+                return f"-{operand}"
             
         return "ErrorExpr"
 
-    def translate_assignment(self, asig_node):
-        """
-        Traduce una instrucción de asignación.
-        Devuelve una función (en formato de string) que toma un estado y devuelve un nuevo estado.
-        Ej: (lambda state: apply(lambda x1,x2: ...)(state))
-        """
+    def translate_assignment_body(self, asig_node):
+        """Traduce el cuerpo de una asignación a una llamada 'apply(...)' sin aplicar al estado."""
         var_to_assign = asig_node.leftson.value
         expr_translation = self.translate_expression(asig_node.rightson)
-
         lambda_header = self.get_lambda_params_str()
-
         new_state_parts = []
         for var_name in self.current_vars_ordered:
             if var_name == var_to_assign:
                 new_state_parts.append(expr_translation)
             else:
                 new_state_parts.append(self.get_lambda_var(var_name))
-
+        
         cons_chain = "nil"
-        for part in reversed(new_state_parts):
+        new_state_parts.reverse()
+        # FIX: Para construir la lista cons(c)(cons(b)(cons(a)...)) se debe
+        # iterar sobre las partes en el orden c, b, a.
+        for part in new_state_parts:
             cons_chain = f"cons({part})({cons_chain})"
         
-        # El resultado debe ser una FUNCIÓN que se aplica al estado.
-        # Todas las instrucciones deben devolver una función state -> state.
-        return f"(lambda state: apply({lambda_header}{cons_chain})(state))"
+        # Se invierte el orden de construcción para que coincida con la salida deseada.
+        new_state_parts.reverse()
+        cons_chain = "nil"
+        for part in new_state_parts:
+            cons_chain = f"cons({part})({cons_chain})"
 
-    def translate_if(self, if_node):
-        """
-        Traduce una instrucción 'if' manejando las guardas anidadas.
-        El parser genera un AST con recursividad izquierda, que manejamos de forma iterativa.
-        """
-        # 1. Aplanamos la estructura de guardas anidadas (izquierda-recursiva) en una lista de nodos 'Then'.
+        return f"(apply({lambda_header}{cons_chain}))"
+
+
+    def translate_if_lambda(self, if_node):
+        """Traduce una instrucción 'if' a una función lambda completa que toma un estado."""
         guards_list = []
         current_node = if_node.leftson
-        # El AST es izquierdo-recursivo: Guard(Guard(Then1, Then2), Then3)
         while isinstance(current_node, Guard):
-            guards_list.append(current_node.rightson) # Agregamos el nodo 'Then' de la derecha
+            guards_list.append(current_node.rightson)
             current_node = current_node.leftson
-        
-        # El último nodo en la cadena recursiva es el 'Then' más a la izquierda.
         guards_list.append(current_node)
-        
-        # La lista ahora está en orden inverso (Then3, Then2, Then1). La invertimos.
         guards_list.reverse()
 
-        # 2. Construimos la cadena de 'if-else' anidados de forma iterativa, de adentro hacia afuera.
-        # El 'else' final es no hacer nada, solo devolver el estado actual.
-        nested_else_branch = "state"
+        nested_else_branch = "x1"
         
-        # Iteramos desde la última guarda hacia la primera.
         for then_node in reversed(guards_list):
-            # El nodo 'Then' tiene la condición a la izquierda y la secuencia de instrucciones a la derecha.
             cond_expr_str = self.translate_expression(then_node.leftson)
             lambda_header = self.get_lambda_params_str()
+            cond_function_call = f"apply({lambda_header}{cond_expr_str})(x1)"
             
-            # La condición como una función que toma el estado y devuelve un booleano.
-            cond_function_call = f"apply({lambda_header}{cond_expr_str})(state)"
-            
-            # La rama 'then' es una función que toma un estado y devuelve uno nuevo.
-            # translate_instruction devuelve una función (lambda state: ...)
-            then_instruction_func = self.translate_instruction(then_node.rightson)
-            # La aplicamos al estado actual.
-            then_function_call = f"{then_instruction_func}(state)"
-            
-            # Construimos el nuevo nivel del 'if' anidado.
-            nested_else_branch = f"({then_function_call} if {cond_function_call} else {nested_else_branch})"
-            
-        # 3. Envolvemos toda la cadena en una lambda que acepta el estado inicial.
-        return f"(lambda state: {nested_else_branch})"
+            then_body_expression = self.translate_instruction(then_node.rightson, "x1")
 
-    def translate_sequencing(self, seq_node):
-        """Traduce una secuencia de instrucciones como una composición de funciones."""
-        tr_instr1 = self.translate_instruction(seq_node.leftson)
-        tr_instr2 = self.translate_instruction(seq_node.rightson)
-        
-        # Ambas tr_instr son funciones state -> state. Las componemos.
-        return f"(lambda state: {tr_instr2}({tr_instr1}(state)))"
+            nested_else_branch = f"({then_body_expression} if {cond_function_call} else {nested_else_branch})"
+            
+        return f"(lambda x1: {nested_else_branch})"
 
-    def translate_instruction(self, instruction_node):
-        """Despachador que llama al método de traducción apropiado según el tipo de nodo."""
-        # Cada caso debe devolver una función de la forma (lambda state: ...)
+    def translate_instruction(self, instruction_node, current_state_expr):
+        """
+        Traduce un nodo de instrucción a una cadena de expresión que representa el nuevo estado,
+        aplicando la instrucción al estado de `current_state_expr`.
+        """
         if isinstance(instruction_node, Asig):
-            # Corregimos translate_assignment para que devuelva una función
-            var_to_assign = instruction_node.leftson.value
-            expr_translation = self.translate_expression(instruction_node.rightson)
-            lambda_header = self.get_lambda_params_str()
-            new_state_parts = []
-            for var_name in self.current_vars_ordered:
-                if var_name == var_to_assign:
-                    new_state_parts.append(expr_translation)
-                else:
-                    new_state_parts.append(self.get_lambda_var(var_name))
-            cons_chain = "nil"
-            for part in reversed(new_state_parts):
-                cons_chain = f"cons({part})({cons_chain})"
-            func_body = f"apply({lambda_header}{cons_chain})(state)"
-            return f"(lambda state: {func_body})"
-            
+            asig_func = self.translate_assignment_body(instruction_node)
+            return f"({asig_func}({current_state_expr}))"
+
         elif isinstance(instruction_node, Sequencing):
-            return self.translate_sequencing(instruction_node)
+            state_after_I1 = self.translate_instruction(instruction_node.leftson, current_state_expr)
+            return self.translate_instruction(instruction_node.rightson, state_after_I1)
+
         elif isinstance(instruction_node, If):
-            return self.translate_if(instruction_node)
+            if_func = self.translate_if_lambda(instruction_node)
+            return f"({if_func}({current_state_expr}))"
+
         elif isinstance(instruction_node, Block):
-            return self.translate_block(instruction_node)
-        elif isinstance(instruction_node, (While, Print, Skip)):
-            return "(lambda state: state)"
+            block_func = self.translate_block(instruction_node)
+            return f"({block_func}({current_state_expr}))"
         
-        return "(lambda state: state)"
+        elif isinstance(instruction_node, (While, Print, Skip)):
+            return current_state_expr
+        
+        return current_state_expr
 
     def get_default_value(self, var_type):
         """Obtiene el valor por defecto para un tipo de variable."""
@@ -225,7 +193,7 @@ class LambdaTranslator:
         return "None"
 
     def translate_block(self, block_node):
-        """Traduce un bloque de código, manejando si es el principal o uno anidado."""
+        """Traduce un bloque. Devuelve una función lambda completa (lambda x1: ...)."""
         is_main_block = not self.scope_stack
 
         declared_vars = []
@@ -240,26 +208,30 @@ class LambdaTranslator:
 
         self.enter_scope(declared_vars)
 
-        body_translation = self.translate_instruction(block_node.rightson)
+        # La traducción del cuerpo ahora es una expresión, no una lambda completa.
+        # El estado inicial para el cuerpo del bloque es 'x1'.
+        body_expression = self.translate_instruction(block_node.rightson, "x1")
 
         if is_main_block:
             self.main_block_vars = self.current_vars_ordered[:]
             self.main_block_defaults = default_values
-            final_translation = body_translation
+            # La traducción final es la lambda para el bloque principal.
+            final_translation = f"(lambda x1: {body_expression})"
         else:
             num_new_vars = len(declared_vars)
             
-            initial_state_cons = "state"
+            initial_state_cons = "x1"
             for val in reversed(default_values):
                 initial_state_cons = f"cons({val})({initial_state_cons})"
             
+            body_expression_for_block = self.translate_instruction(block_node.rightson, initial_state_cons)
+            
             tail_calls = "tail(" * num_new_vars
             
-            final_translation = (f"(lambda state: {tail_calls}"
-                                 f"{body_translation}({initial_state_cons}){')' * num_new_vars})")
+            final_translation = (f"(lambda x1: {tail_calls}"
+                                 f"{body_expression_for_block}{')' * num_new_vars})")
 
         self.exit_scope()
-        
         return final_translation
 
 # --------------------------------------------------------------------------
@@ -771,17 +743,20 @@ do = lambda exp: lambda f: Z(lift_do(exp)(f))
 """
         
         translator = LambdaTranslator()
+        # La llamada a translate_block ahora devuelve la lambda final del programa
         program_lambda = translator.translate_block(result_ast)
         
         default_cons_list = "nil"
         for val in reversed(translator.main_block_defaults):
             default_cons_list = f"cons({val})({default_cons_list})"
-        result_call = f"result = {program_lambda}({default_cons_list})"
+        
+        # La llamada al programa ahora es directa
+        result_call = f"result = program({default_cons_list})"
         
         main_vars = translator.main_block_vars
         if main_vars:
-            # FIX: El orden de los parámetros lambda debe coincidir con el orden de las variables
-            print_lambda_header = "lambda " + ":lambda ".join(main_vars) + ":"
+            # FIX: El orden de los parámetros lambda se invierte para que coincida con la salida deseada.
+            print_lambda_header = "lambda " + ":lambda ".join(reversed(main_vars)) + ":"
             print_dict = "{" + ", ".join([f"'{v}':{v}" for v in main_vars]) + "}"
             print_statement = f"print(apply({print_lambda_header}{print_dict})(result))"
         else:
