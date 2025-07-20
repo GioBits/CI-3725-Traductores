@@ -37,13 +37,11 @@ class LambdaTranslator:
         Entra en un nuevo ámbito, actualizando la lista de variables, mapeos y tipos.
         """
         self.scope_stack.append((self.current_vars_ordered, self.var_to_lambda_map, self.var_to_type_map))
-        
         declared_vars_list = list(declared_vars_with_types.keys())
-        self.current_vars_ordered = self.current_vars_ordered + declared_vars_list
-        
+        # Las variables internas van al principio para que el sombreado funcione correctamente
+        self.current_vars_ordered = declared_vars_list + self.current_vars_ordered
         self.var_to_type_map = self.var_to_type_map.copy()
         self.var_to_type_map.update(declared_vars_with_types)
-
         new_map = {}
         for i, var_name in enumerate(self.current_vars_ordered):
             new_map[var_name] = f"x{i + 1}"
@@ -281,7 +279,6 @@ class LambdaTranslator:
         declared_vars_with_types = {}
         default_values = []
         if block_node.leftson and block_node.leftson.children:
-            # Asegurar un orden consistente de declaración.
             sorted_children = sorted(block_node.leftson.children, key=lambda d: d.VariableAndType[1][0])
             for declare_node in sorted_children:
                 var_type = declare_node.VariableAndType[0]
@@ -290,6 +287,7 @@ class LambdaTranslator:
                     declared_vars_with_types[var_name] = var_type
                     default_values.append(self.get_default_value(var_type))
 
+        # Guarda el estado anterior antes de entrar al nuevo scope
         self.enter_scope(declared_vars_with_types)
 
         body_expression = self.translate_instruction(block_node.rightson, "x1")
@@ -301,17 +299,37 @@ class LambdaTranslator:
             final_translation = f"(lambda x1: {body_expression})"
         else:
             num_new_vars = len(declared_vars_with_types)
-            
             initial_state_cons = "x1"
             for val in reversed(default_values):
                 initial_state_cons = f"cons({val})({initial_state_cons})"
-            
             body_expression_for_block = self.translate_instruction(block_node.rightson, initial_state_cons)
-            
-            tail_calls = "tail(" * num_new_vars
-            
-            final_translation = (f"(lambda x1: {tail_calls}"
-                                 f"{body_expression_for_block}{')' * num_new_vars})")
+
+            # --- Restaurar el estado anterior correctamente ---
+            prev_vars_ordered, prev_var_to_lambda_map, prev_var_to_type_map = self.scope_stack[-1]
+            var_count = len(prev_vars_ordered)
+            state_var = "s"
+            # Construye la expresión para extraer los valores de las variables externas
+            def build_state_unpack_expr(var_count, state_var):
+                exprs = []
+                for i in range(var_count):
+                    accessor = state_var
+                    for _ in range(i):
+                        accessor = f"tail({accessor})"
+                    exprs.append(f"head({accessor})")
+                return exprs
+            unpack_exprs = build_state_unpack_expr(var_count, state_var)
+            cons_chain = "nil"
+            for expr in reversed(unpack_exprs):
+                cons_chain = f"cons({expr})({cons_chain})"
+            rebuild_lambda = f"(lambda {state_var}: {cons_chain})"
+
+            # Aplica tail N veces al estado resultante del bloque para quitar las internas
+            tail_expr = body_expression_for_block
+            for _ in range(num_new_vars):
+                tail_expr = f"tail({tail_expr})"
+
+            # Aplica la lambda reconstruida al tail_expr
+            final_translation = f"(lambda x1: {rebuild_lambda}({tail_expr}))"
 
         self.exit_scope()
         return final_translation
