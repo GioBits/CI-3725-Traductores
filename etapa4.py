@@ -969,4 +969,4 @@ def church_list_to_python_list(church_list):
         print(f"Traducción completada. Archivo generado: {output_filename}")
 
 if __name__ == "__main__":
-    main()
+    main() 
