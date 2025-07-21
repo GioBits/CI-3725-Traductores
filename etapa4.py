@@ -93,7 +93,7 @@ class LambdaTranslator:
             if expr_node.op == "ReadFunction":
                 # Si se eliminó nth, esta funcionalidad no será directamente soportada.
                 # Se dejará como un placeholder o error si se encuentra.
-                return f"/* ERROR: nth no está definido si se eliminó. */({left}({right}))" 
+                return f"/* ERROR: nth is not defined. */({left}({right}))" 
 
             op_map = {
                 "Plus": "+", "Minus": "-", "Mult": "*",
@@ -180,7 +180,7 @@ class LambdaTranslator:
             # Si se eliminó update_nth, esta funcionalidad no será directamente soportada.
             # Se dejará como un placeholder o error si se encuentra.
             array_current_state = self.get_lambda_var(array_name)
-            updated_array_expr = f"/* ERROR: update_nth no está definido si se eliminó. */({array_current_state}, {index_expr}, {value_expr})"
+            updated_array_expr = f"/* ERROR: update_nth is not defined. */({array_current_state}, {index_expr}, {value_expr})"
 
             lambda_header = self.get_lambda_params_str()
             new_state_parts = []
@@ -906,6 +906,7 @@ def main():
             
         # Modificado: Se eliminan nth, update_nth y church_list_to_python_list
         combinators = """
+# -*- coding: utf-8 -*-
 Z = lambda g:(lambda x:g(lambda v:x(x)(v)))(lambda x:g(lambda v:x(x)(v)))
 true = lambda x:lambda y:x
 false = lambda x:lambda y:y
@@ -944,7 +945,7 @@ do=lambda exp:lambda f:Z(lift_do(exp)(f))
                 # Modificado: Si ya no se usa church_list_to_python_list, se imprime el valor
                 # tal cual o un mensaje para tipos de función/arreglo.
                 elif var_type.startswith('function'):
-                    dict_parts.append(f"'{v_name}': 'Función/Arreglo (representación lambda)'") # O simplemente f"'{v_name}': {v_name}"
+                    dict_parts.append(f"'{v_name}': 'Function/Array (lambda representation)'") # O simplemente f"'{v_name}': {v_name}"
                 else:
                     dict_parts.append(f"'{v_name}': {v_name}")
             
