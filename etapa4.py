@@ -91,9 +91,7 @@ class LambdaTranslator:
             
             # UPDATE: Traducir el acceso a funciones/arreglos usando el combinador 'nth'.
             if expr_node.op == "ReadFunction":
-                # Si se eliminó nth, esta funcionalidad no será directamente soportada.
-                # Se dejará como un placeholder o error si se encuentra.
-                return f"/* ERROR: nth is not defined. */({left}({right}))" 
+                return f"nth({right})({left})"
 
             op_map = {
                 "Plus": "+", "Minus": "-", "Mult": "*",
@@ -180,12 +178,14 @@ class LambdaTranslator:
             # Si se eliminó update_nth, esta funcionalidad no será directamente soportada.
             # Se dejará como un placeholder o error si se encuentra.
             array_current_state = self.get_lambda_var(array_name)
-            updated_array_expr = f"/* ERROR: update_nth is not defined. */({array_current_state}, {index_expr}, {value_expr})"
+            updated_array_expr = f"({array_current_state}(update_nth({index_expr})({value_expr}))(nil))"
 
             lambda_header = self.get_lambda_params_str()
             new_state_parts = []
             for var_name in self.current_vars_ordered:
                 if var_name == array_name:
+                    # Aplicar update_nth al estado actual del array
+                    updated_array_expr = f"update_nth({index_expr})({value_expr})({array_current_state})"
                     new_state_parts.append(updated_array_expr)
                 else:
                     new_state_parts.append(self.get_lambda_var(var_name))
@@ -904,9 +904,8 @@ def main():
             print(errores[0])
             sys.exit(1)
             
-        # Modificado: Se eliminan nth, update_nth y church_list_to_python_list
+        # Modificado: Se agregan nth y update_nth para acceso y actualización de listas Church
         combinators = """
-# -*- coding: utf-8 -*-
 Z = lambda g:(lambda x:g(lambda v:x(x)(v)))(lambda x:g(lambda v:x(x)(v)))
 true = lambda x:lambda y:x
 false = lambda x:lambda y:y
@@ -917,6 +916,27 @@ tail = lambda p:p(false)
 apply = Z(lambda g:lambda f:lambda x:f if x==nil else (g(f(head(x)))(tail(x))))
 lift_do=lambda exp:lambda f:lambda g: lambda x: g(f(x)) if (exp(x)) else x
 do=lambda exp:lambda f:Z(lift_do(exp)(f))
+nth = Z(lambda g: lambda n: lambda l: head(l) if n == 0 else g(n-1)(tail(l)))
+update_nth = Z(lambda g: lambda n: lambda val: lambda l: \\
+  cons(val)(tail(l)) if n == 0 else cons(head(l))(g(n-1)(val)(tail(l))))
+
+# Helper function to convert Church-encoded list to Python list for printing
+def church_list_to_python_list(church_list):
+    result = []
+    current = church_list
+    while current != nil:
+        try:
+            # Attempt to get the head. If it's a boolean, convert from Church boolean.
+            h = head(current)
+            if callable(h) and h(True)(False) in [True, False]: # Check if it's a Church boolean
+                result.append(h(True)(False))
+            else:
+                result.append(h)
+            current = tail(current)
+        except Exception:
+            # If head(current) fails (e.g., trying to get head of nil), break
+            break
+    return result
 """
         
         translator = LambdaTranslator()
@@ -942,10 +962,11 @@ do=lambda exp:lambda f:Z(lift_do(exp)(f))
                 var_type = main_var_types.get(v_name)
                 if var_type == 'bool':
                     dict_parts.append(f"'{v_name}': {v_name}(True)(False)")
-                # Modificado: Si ya no se usa church_list_to_python_list, se imprime el valor
-                # tal cual o un mensaje para tipos de función/arreglo.
+
+                # si es una función/arreglo, de lo contrario, se muestra como un string.
                 elif var_type.startswith('function'):
-                    dict_parts.append(f"'{v_name}': 'Function/Array (lambda representation)'") # O simplemente f"'{v_name}': {v_name}"
+                    # Ahora se convierte la lista Church a una lista de Python para imprimir
+                    dict_parts.append(f"'{v_name}': church_list_to_python_list({v_name})")
                 else:
                     dict_parts.append(f"'{v_name}': {v_name}")
             
